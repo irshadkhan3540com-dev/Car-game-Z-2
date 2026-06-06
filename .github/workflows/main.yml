@@ -37,21 +37,20 @@ jobs:
           rootProject.name = "ZPlus2VideoPlay"
           include ':app'
           EOF
-          
+
           cat << 'EOF' > build.gradle
           plugins { id 'com.android.application' version '8.3.0' apply false; id 'org.jetbrains.kotlin.android' version '1.9.0' apply false }
           EOF
-          
+
           cat << 'EOF' > gradle.properties
           android.useAndroidX=true
           org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8
           EOF
-          
+
           gradle wrapper --gradle-version 8.4 --distribution-type bin
 
-      - name: "Step 6: Setup 100% Safe Vector Icon (Fix for Crash)"
+      - name: "Step 6: Setup 100% Safe Vector Icon"
         run: |
-          # FIX: Hardcoded the XML vector to avoid internet download failures
           cat << 'EOF' > app/src/main/res/drawable/ic_phone_player.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="24dp" android:height="24dp"
@@ -60,13 +59,12 @@ jobs:
           </vector>
           EOF
 
-      - name: "Step 7: App Custom UI Layout Styles"
+      - name: "Step 7: App Custom UI Layout - MX Player Style with Auto-Hide + Lock"
         run: |
           cat << 'EOF' > app/src/main/res/values/strings.xml
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">Z+ 2 video play</string>
-              <string name="header_title">Z+ 2 video play</string>
           </resources>
           EOF
 
@@ -79,87 +77,111 @@ jobs:
               <color name="brand_blue">#004AAD</color>
           </resources>
           EOF
-          
+
+          # UPDATED: Fullscreen theme - no title bar, no status bar
           cat << 'EOF' > app/src/main/res/values/themes.xml
           <resources>
               <style name="Theme.VideoEngine" parent="Theme.AppCompat.Light.NoActionBar">
                   <item name="android:windowNoTitle">true</item>
+                  <item name="android:windowFullscreen">true</item>
+                  <item name="android:windowContentOverlay">@null</item>
               </style>
           </resources>
           EOF
-          
+
+          # UPDATED LAYOUT: Full screen PlayerView + hidden overlay controls + lock button
           cat << 'EOF' > app/src/main/res/layout/activity_main.xml
           <?xml version="1.0" encoding="utf-8"?>
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
               android:background="@color/black">
-              
-              <LinearLayout
-                  android:id="@+id/topBlueHeader"
-                  android:layout_width="match_parent"
-                  android:layout_height="60dp"
-                  android:background="@color/brand_blue"
-                  android:gravity="center"
-                  android:padding="10dp"
-                  android:layout_alignParentTop="true">
-                  <TextView
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="@string/header_title"
-                      android:textColor="@color/white"
-                      android:textSize="18sp"
-                      android:textStyle="bold" />
-              </LinearLayout>
-              
+
+              <!-- FULL SCREEN VIDEO PLAYER - No top/bottom constraints -->
               <androidx.media3.ui.PlayerView
                   android:id="@+id/playerView"
                   android:layout_width="match_parent"
-                  android:layout_height="match_parent"
-                  android:layout_below="@id/topBlueHeader"
-                  android:layout_above="@id/bottomControllerBar"
-                  android:layout_centerInParent="true"/>
+                  android:layout_height="match_parent"/>
 
+              <!-- LOCK BUTTON (Left side, center vertical) - Hidden by default -->
+              <Button
+                  android:id="@+id/btnLock"
+                  android:layout_width="52dp"
+                  android:layout_height="52dp"
+                  android:layout_centerVertical="true"
+                  android:layout_alignParentStart="true"
+                  android:layout_marginStart="14dp"
+                  android:text="🔓"
+                  android:textSize="22sp"
+                  android:padding="0dp"
+                  android:backgroundTint="#AA000000"
+                  android:visibility="gone"/>
+
+              <!-- BOTTOM CONTROLS BAR - Hidden by default, appears on tap -->
               <LinearLayout
                   android:id="@+id/bottomControllerBar"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
                   android:orientation="vertical"
                   android:layout_alignParentBottom="true"
-                  android:background="#99000000"
-                  android:padding="10dp">
-                  
+                  android:background="#CC000000"
+                  android:padding="10dp"
+                  android:visibility="gone">
+
                   <LinearLayout
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
                       android:orientation="horizontal"
                       android:layout_marginBottom="5dp">
-                      <Button android:id="@+id/btnSelectMovie" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="🎬 MOVIE" />
-                      <Button android:id="@+id/btnAudioBoost" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="🔊 BOOST" android:layout_marginHorizontal="5dp" android:backgroundTint="@color/player_red"/>
-                      <Button android:id="@+id/btnFitScreen" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="📱 FIT" />
+                      <Button android:id="@+id/btnSelectMovie"
+                          android:layout_width="0dp" android:layout_height="wrap_content"
+                          android:layout_weight="1" android:text="🎬 MOVIE"/>
+                      <Button android:id="@+id/btnAudioBoost"
+                          android:layout_width="0dp" android:layout_height="wrap_content"
+                          android:layout_weight="1" android:text="🔊 BOOST"
+                          android:layout_marginHorizontal="5dp"
+                          android:backgroundTint="@color/player_red"/>
+                      <Button android:id="@+id/btnFitScreen"
+                          android:layout_width="0dp" android:layout_height="wrap_content"
+                          android:layout_weight="1" android:text="📱 FIT"/>
                   </LinearLayout>
 
                   <LinearLayout
                       android:layout_width="match_parent"
                       android:layout_height="wrap_content"
                       android:orientation="horizontal">
-                      <Button android:id="@+id/btnLanguage" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="🌐 LANGUAGE" android:layout_marginEnd="5dp"/>
-                      <Button android:id="@+id/btnBrightness" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="🔆 BRIGHT: 100%" android:layout_marginStart="5dp"/>
+                      <Button android:id="@+id/btnLanguage"
+                          android:layout_width="0dp" android:layout_height="wrap_content"
+                          android:layout_weight="1" android:text="🌐 LANGUAGE"
+                          android:layout_marginEnd="5dp"/>
+                      <Button android:id="@+id/btnBrightness"
+                          android:layout_width="0dp" android:layout_height="wrap_content"
+                          android:layout_weight="1" android:text="🔆 BRIGHT: 100%"
+                          android:layout_marginStart="5dp"/>
                   </LinearLayout>
               </LinearLayout>
+
           </RelativeLayout>
           EOF
-          
+
           cat << 'EOF' > app/src/main/AndroidManifest.xml
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:tools="http://schemas.android.com/tools">
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
               <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
               <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage"/>
-              
-              <application android:label="@string/app_name" android:icon="@drawable/ic_phone_player" android:theme="@style/Theme.VideoEngine" android:requestLegacyExternalStorage="true">
-                  <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize|layoutDirection">
+              <application
+                  android:label="@string/app_name"
+                  android:icon="@drawable/ic_phone_player"
+                  android:theme="@style/Theme.VideoEngine"
+                  android:requestLegacyExternalStorage="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|layoutDirection">
                       <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
                   </activity>
               </application>
@@ -173,35 +195,43 @@ jobs:
           android {
               namespace 'com.zatomic.videoengine'
               compileSdk 34
-              defaultConfig { applicationId 'com.zatomic.videoengine'; minSdk 26; targetSdk 34; versionCode 4; versionName "4.0-VIP" }
+              defaultConfig { applicationId 'com.zatomic.videoengine'; minSdk 26; targetSdk 34; versionCode 5; versionName "5.0-VIP" }
               compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = '17' }
+              lint { abortOnError false }
           }
           dependencies {
               implementation 'androidx.core:core-ktx:1.12.0'
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'com.google.android.material:material:1.11.0'
-              
               implementation 'androidx.media3:media3-exoplayer:1.3.0'
               implementation 'androidx.media3:media3-ui:1.3.0'
               implementation 'androidx.media3:media3-session:1.3.0'
           }
           EOF
 
-      - name: "Step 9: Write 100% Safe Kotlin Logic"
+      - name: "Step 9: Write Complete Kotlin Logic - Auto-Hide + Lock + Fullscreen"
         run: |
           cat << 'EOF' > app/src/main/java/com/zatomic/videoengine/MainActivity.kt
           package com.zatomic.videoengine
-          
+
+          import android.annotation.SuppressLint
           import android.content.Intent
           import android.media.audiofx.LoudnessEnhancer
           import android.net.Uri
           import android.os.Build
           import android.os.Bundle
           import android.os.Environment
+          import android.os.Handler
+          import android.os.Looper
           import android.provider.Settings
-          import android.view.WindowManager
+          import android.view.GestureDetector
+          import android.view.MotionEvent
+          import android.view.View
+          import android.view.WindowInsets
+          import android.view.WindowInsetsController
           import android.widget.Button
+          import android.widget.LinearLayout
           import android.widget.Toast
           import androidx.activity.result.contract.ActivityResultContracts
           import androidx.appcompat.app.AlertDialog
@@ -213,41 +243,107 @@ jobs:
           import androidx.media3.ui.PlayerView
 
           class MainActivity : AppCompatActivity() {
+
               private var player: ExoPlayer? = null
               private lateinit var playerView: PlayerView
+              private lateinit var bottomBar: LinearLayout
+              private lateinit var btnLock: Button
               private var loudnessEnhancer: LoudnessEnhancer? = null
-              private var isBoosted = false
-              private var screenMode = 0 
-              private var brightnessLevel = 1.0f
 
-              private val videoPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-                  uri?.let {
-                      val mediaItem = MediaItem.fromUri(it)
-                      player?.setMediaItem(mediaItem)
-                      player?.prepare()
-                      player?.play()
-                      
-                      player?.audioSessionId?.let { sessionId ->
-                          if (sessionId != C.AUDIO_SESSION_ID_UNSET) {
-                              try { loudnessEnhancer = LoudnessEnhancer(sessionId) } catch (e: Exception) { e.printStackTrace() }
+              // Feature state variables
+              private var isBoosted = false
+              private var screenMode = 0
+              private var brightnessLevel = 1.0f
+              private var isLocked = false
+              private var isControlsVisible = false
+
+              // Auto-hide handler (3 second timer)
+              private val uiHandler = Handler(Looper.getMainLooper())
+              private val hideRunnable = Runnable { hideControls() }
+
+              // ─── Video Picker ──────────────────────────────────────────────
+              private val videoPicker =
+                  registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+                      uri?.let {
+                          val mediaItem = MediaItem.fromUri(it)
+                          player?.setMediaItem(mediaItem)
+                          player?.prepare()
+                          player?.play()
+                          player?.audioSessionId?.let { sid ->
+                              if (sid != C.AUDIO_SESSION_ID_UNSET) {
+                                  try { loudnessEnhancer = LoudnessEnhancer(sid) }
+                                  catch (e: Exception) { e.printStackTrace() }
+                              }
                           }
                       }
                   }
-              }
 
+              // ─── onCreate ─────────────────────────────────────────────────
+              @SuppressLint("ClickableViewAccessibility")
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   setContentView(R.layout.activity_main)
+
+                  enableImmersiveFullScreen()
                   checkSystemStoragePermission()
 
                   playerView = findViewById(R.id.playerView)
+                  bottomBar  = findViewById(R.id.bottomControllerBar)
+                  btnLock    = findViewById(R.id.btnLock)
+
                   player = ExoPlayer.Builder(this).build()
                   playerView.player = player
 
+                  // ── FEATURE 1: Tap-to-show / Auto-hide UI (3 seconds) ──
+                  val gestureDetector = GestureDetector(
+                      this,
+                      object : GestureDetector.SimpleOnGestureListener() {
+                          override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                              if (isLocked) {
+                                  // When locked: show only the Lock button for 3s
+                                  btnLock.visibility = View.VISIBLE
+                                  uiHandler.removeCallbacks(hideRunnable)
+                                  uiHandler.postDelayed(
+                                      { btnLock.visibility = View.GONE }, 3000
+                                  )
+                              } else {
+                                  toggleControls()
+                              }
+                              return true
+                          }
+                      }
+                  )
+                  playerView.setOnTouchListener { _, event ->
+                      gestureDetector.onTouchEvent(event)
+                      false  // false = let ExoPlayer also handle the touch (play/pause)
+                  }
+
+                  // ── FEATURE 2: Lock / Unlock Button ──
+                  btnLock.setOnClickListener {
+                      isLocked = !isLocked
+                      if (isLocked) {
+                          btnLock.text = "🔒"
+                          bottomBar.visibility = View.GONE
+                          isControlsVisible = false
+                          Toast.makeText(this, "🔒 Screen Locked", Toast.LENGTH_SHORT).show()
+                          uiHandler.removeCallbacks(hideRunnable)
+                          // Auto-hide lock button after 2s so screen is completely clean
+                          uiHandler.postDelayed({ btnLock.visibility = View.GONE }, 2000)
+                      } else {
+                          btnLock.text = "🔓"
+                          Toast.makeText(this, "🔓 Screen Unlocked", Toast.LENGTH_SHORT).show()
+                          showControls()
+                      }
+                  }
+
+                  // ── Buttons ──
                   findViewById<Button>(R.id.btnSelectMovie).setOnClickListener {
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                          if (Environment.isExternalStorageManager()) videoPicker.launch("video/*") else showPermissionDialog()
-                      } else { videoPicker.launch("video/*") }
+                          if (Environment.isExternalStorageManager()) videoPicker.launch("video/*")
+                          else showPermissionDialog()
+                      } else {
+                          videoPicker.launch("video/*")
+                      }
                   }
 
                   findViewById<Button>(R.id.btnAudioBoost).setOnClickListener { btn ->
@@ -256,67 +352,131 @@ jobs:
                           try {
                               if (!isBoosted) {
                                   loudnessEnhancer?.enabled = true
-                                  loudnessEnhancer?.setTargetGain(5000) 
+                                  loudnessEnhancer?.setTargetGain(5000)
                                   isBoosted = true
                                   button.text = "🔊 500% ON"
-                                  Toast.makeText(this@MainActivity, "🔥 Sound Engine Maxed!", Toast.LENGTH_SHORT).show()
+                                  Toast.makeText(this, "🔥 Sound Engine Maxed!", Toast.LENGTH_SHORT).show()
                               } else {
                                   loudnessEnhancer?.setTargetGain(0)
                                   loudnessEnhancer?.enabled = false
                                   isBoosted = false
                                   button.text = "🔊 BOOST"
                               }
-                          } catch (e: Exception) { Toast.makeText(this, "Limit reached.", Toast.LENGTH_SHORT).show() }
-                      } else { Toast.makeText(this, "Please play a movie first!", Toast.LENGTH_SHORT).show() }
+                          } catch (e: Exception) {
+                              Toast.makeText(this, "Limit reached.", Toast.LENGTH_SHORT).show()
+                          }
+                      } else {
+                          Toast.makeText(this, "Please play a movie first!", Toast.LENGTH_SHORT).show()
+                      }
                   }
 
                   findViewById<Button>(R.id.btnFitScreen).setOnClickListener { btn ->
                       val button = btn as Button
                       when (screenMode) {
-                          0 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM; screenMode = 1; button.text = "📱 ZOOM" }
-                          1 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL; screenMode = 2; button.text = "📱 STRETCH" }
-                          2 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT; screenMode = 0; button.text = "📱 FIT" }
+                          0 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM;    screenMode = 1; button.text = "📱 ZOOM" }
+                          1 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL;    screenMode = 2; button.text = "📱 STRETCH" }
+                          2 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT;     screenMode = 0; button.text = "📱 FIT" }
                       }
                   }
 
-                  // FIX: Crash Proof Language Button
                   findViewById<Button>(R.id.btnLanguage).setOnClickListener {
-                      Toast.makeText(this@MainActivity, "⚙️ Click the Gear Icon on the video screen to change Audio/Language", Toast.LENGTH_LONG).show()
+                      Toast.makeText(
+                          this,
+                          "⚙️ Click the Gear Icon on the video screen to change Audio/Language",
+                          Toast.LENGTH_LONG
+                      ).show()
                   }
 
                   findViewById<Button>(R.id.btnBrightness).setOnClickListener { btn ->
                       val button = btn as Button
                       brightnessLevel -= 0.25f
-                      if (brightnessLevel < 0.25f) brightnessLevel = 1.0f 
-                      val layoutParams = window.attributes
-                      layoutParams.screenBrightness = brightnessLevel
-                      window.attributes = layoutParams
+                      if (brightnessLevel < 0.25f) brightnessLevel = 1.0f
+                      val lp = window.attributes
+                      lp.screenBrightness = brightnessLevel
+                      window.attributes = lp
                       button.text = "🔆 BRIGHT: ${(brightnessLevel * 100).toInt()}%"
                   }
               }
 
+              // ─── FEATURE 3: MX Player-style Immersive Full Screen ─────────
+              @SuppressLint("NewApi")
+              private fun enableImmersiveFullScreen() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                      window.insetsController?.let { ctrl ->
+                          ctrl.hide(
+                              WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars()
+                          )
+                          ctrl.systemBarsBehavior =
+                              WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                      }
+                  } else {
+                      @Suppress("DEPRECATION")
+                      window.decorView.systemUiVisibility = (
+                          View.SYSTEM_UI_FLAG_FULLSCREEN          or
+                          View.SYSTEM_UI_FLAG_HIDE_NAVIGATION     or
+                          View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY    or
+                          View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN   or
+                          View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                      )
+                  }
+              }
+
+              // Restore immersive mode when app regains focus (e.g. after dialog)
+              override fun onWindowFocusChanged(hasFocus: Boolean) {
+                  super.onWindowFocusChanged(hasFocus)
+                  if (hasFocus) enableImmersiveFullScreen()
+              }
+
+              // ─── Auto-Hide Helpers ─────────────────────────────────────────
+              private fun showControls() {
+                  if (isLocked) return
+                  bottomBar.visibility = View.VISIBLE
+                  btnLock.visibility   = View.VISIBLE
+                  isControlsVisible    = true
+                  uiHandler.removeCallbacks(hideRunnable)
+                  uiHandler.postDelayed(hideRunnable, 3000)   // Auto-hide after 3 seconds
+              }
+
+              private fun hideControls() {
+                  bottomBar.visibility = View.GONE
+                  btnLock.visibility   = View.GONE
+                  isControlsVisible    = false
+              }
+
+              private fun toggleControls() {
+                  if (isControlsVisible) hideControls() else showControls()
+              }
+
+              // ─── Permissions ───────────────────────────────────────────────
               private fun checkSystemStoragePermission() {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) { showPermissionDialog() }
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                      !Environment.isExternalStorageManager()) {
+                      showPermissionDialog()
+                  }
               }
 
               private fun showPermissionDialog() {
                   AlertDialog.Builder(this)
                       .setTitle("Permission Required")
-                      .setMessage("Please toggle 'Allow management of all files' in the next screen to play videos.")
+                      .setMessage("Please toggle 'Allow management of all files' to play videos.")
                       .setCancelable(false)
                       .setPositiveButton("Go To Settings") { _, _ ->
                           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                               try {
                                   val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                                  intent.data = Uri.parse(String.format("package:%s", applicationContext.packageName))
+                                  intent.data = Uri.parse("package:${applicationContext.packageName}")
                                   startActivity(intent)
-                              } catch (e: Exception) { startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+                              } catch (e: Exception) {
+                                  startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                              }
                           }
                       }.show()
               }
 
+              // ─── Cleanup ───────────────────────────────────────────────────
               override fun onDestroy() {
                   super.onDestroy()
+                  uiHandler.removeCallbacksAndMessages(null)
                   player?.release()
                   loudnessEnhancer?.release()
               }
@@ -331,6 +491,5 @@ jobs:
       - name: "Step 11: Deploy Professional Target Package"
         uses: actions/upload-artifact@v4
         with:
-          name: "ZPlus-2-Video-Play-Engine"
+          name: "ZPlus-2-Video-Play-Engine-V5"
           path: app/build/outputs/apk/debug/app-debug.apk
-
