@@ -49,19 +49,18 @@ jobs:
           
           gradle wrapper --gradle-version 8.4 --distribution-type bin
 
-      - name: "Step 6: Download & Setup Professional Phone Icon Framework"
+      - name: "Step 6: Setup 100% Safe Vector Icon (Fix for Crash)"
         run: |
-          # Downloading a high-quality vector source phone icon
-          curl -s -o app/src/main/res/drawable/ic_phone_player.xml "https://raw.githubusercontent.com/google/material-design-icons/master/src/hardware/smart_display/materialicons/24px.xml" || true
-          
-          # Fallback phone matrix icon
-          if [ ! -f app/src/main/res/drawable/ic_phone_player.xml ]; then
-            cat << 'EOF' > app/src/main/res/drawable/ic_phone_player.xml
-            <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"><path android:fillColor="#FF2196F3" android:pathData="I17,1H7C5.34,1 4,2.34 4,4v16c0,1.66 1.34,3 3,3h10c1.66,0 3,-1.34 3,-3V4c0,-1.66 -1.34,-3 -3,-3zM12,21c-0.55,0 -1,-0.45 -1,-1s0.45,-1 1,-1 1,0.45 1,1 -0.45,1 -1,1zM18,17H6V4h12v13z"/></vector>
+          # FIX: Hardcoded the XML vector to avoid internet download failures
+          cat << 'EOF' > app/src/main/res/drawable/ic_phone_player.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FF2196F3" android:pathData="M17,1H7C5.34,1 4,2.34 4,4v16c0,1.66 1.34,3 3,3h10c1.66,0 3,-1.34 3,-3V4c0,-1.66 -1.34,-3 -3,-3zM12,21c-0.55,0 -1,-0.45 -1,-1s0.45,-1 1,-1 1,0.45 1,1 -0.45,1 -1,1zM18,17H6V4h12v13z"/>
+          </vector>
           EOF
-          fi
 
-      - name: "Step 7: App Custom UI Layout Styles & Beautiful Blue Header"
+      - name: "Step 7: App Custom UI Layout Styles"
         run: |
           cat << 'EOF' > app/src/main/res/values/strings.xml
           <?xml version="1.0" encoding="utf-8"?>
@@ -89,7 +88,6 @@ jobs:
           </resources>
           EOF
           
-          # Custom Responsive Layout with 2-Row Control Panel (Added Language & Brightness)
           cat << 'EOF' > app/src/main/res/layout/activity_main.xml
           <?xml version="1.0" encoding="utf-8"?>
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -104,7 +102,6 @@ jobs:
                   android:gravity="center"
                   android:padding="10dp"
                   android:layout_alignParentTop="true">
-                  
                   <TextView
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
@@ -152,7 +149,6 @@ jobs:
           </RelativeLayout>
           EOF
           
-          # Android Manifest
           cat << 'EOF' > app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
@@ -170,7 +166,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: "Step 8: Inject Google Media3 Core Framework Context"
+      - name: "Step 8: Inject Google Media3 Core Framework"
         run: |
           cat << 'EOF' > app/build.gradle
           plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
@@ -192,7 +188,7 @@ jobs:
           }
           EOF
 
-      - name: "Step 9: Write Settings Redirect & VIP Features Logic (Kotlin)"
+      - name: "Step 9: Write 100% Safe Kotlin Logic"
         run: |
           cat << 'EOF' > app/src/main/java/com/zatomic/videoengine/MainActivity.kt
           package com.zatomic.videoengine
@@ -215,7 +211,6 @@ jobs:
           import androidx.media3.exoplayer.ExoPlayer
           import androidx.media3.ui.AspectRatioFrameLayout
           import androidx.media3.ui.PlayerView
-          import androidx.media3.ui.TrackSelectionDialogBuilder
 
           class MainActivity : AppCompatActivity() {
               private var player: ExoPlayer? = null
@@ -223,7 +218,7 @@ jobs:
               private var loudnessEnhancer: LoudnessEnhancer? = null
               private var isBoosted = false
               private var screenMode = 0 
-              private var brightnessLevel = 1.0f // 100%
+              private var brightnessLevel = 1.0f
 
               private val videoPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
                   uri?.let {
@@ -234,11 +229,7 @@ jobs:
                       
                       player?.audioSessionId?.let { sessionId ->
                           if (sessionId != C.AUDIO_SESSION_ID_UNSET) {
-                              try {
-                                  loudnessEnhancer = LoudnessEnhancer(sessionId)
-                              } catch (e: Exception) {
-                                  e.printStackTrace()
-                              }
+                              try { loudnessEnhancer = LoudnessEnhancer(sessionId) } catch (e: Exception) { e.printStackTrace() }
                           }
                       }
                   }
@@ -247,28 +238,18 @@ jobs:
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   setContentView(R.layout.activity_main)
-
-                  // Bootup Setting Check
                   checkSystemStoragePermission()
 
                   playerView = findViewById(R.id.playerView)
                   player = ExoPlayer.Builder(this).build()
                   playerView.player = player
 
-                  // 1. Movie Selector
                   findViewById<Button>(R.id.btnSelectMovie).setOnClickListener {
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                          if (Environment.isExternalStorageManager()) {
-                              videoPicker.launch("video/*")
-                          } else {
-                              showPermissionDialog()
-                          }
-                      } else {
-                          videoPicker.launch("video/*")
-                      }
+                          if (Environment.isExternalStorageManager()) videoPicker.launch("video/*") else showPermissionDialog()
+                      } else { videoPicker.launch("video/*") }
                   }
 
-                  // 2. Audio Booster
                   findViewById<Button>(R.id.btnAudioBoost).setOnClickListener { btn ->
                       val button = btn as Button
                       if (loudnessEnhancer != null) {
@@ -285,92 +266,53 @@ jobs:
                                   isBoosted = false
                                   button.text = "🔊 BOOST"
                               }
-                          } catch (e: Exception) {
-                              Toast.makeText(this@MainActivity, "Device limits extreme boost.", Toast.LENGTH_SHORT).show()
-                          }
-                      } else {
-                          Toast.makeText(this@MainActivity, "Please play a movie first!", Toast.LENGTH_SHORT).show()
-                      }
+                          } catch (e: Exception) { Toast.makeText(this, "Limit reached.", Toast.LENGTH_SHORT).show() }
+                      } else { Toast.makeText(this, "Please play a movie first!", Toast.LENGTH_SHORT).show() }
                   }
 
-                  // 3. Screen Fitter
                   findViewById<Button>(R.id.btnFitScreen).setOnClickListener { btn ->
                       val button = btn as Button
                       when (screenMode) {
-                          0 -> {
-                              playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                              screenMode = 1
-                              button.text = "📱 ZOOM"
-                          }
-                          1 -> {
-                              playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
-                              screenMode = 2
-                              button.text = "📱 STRETCH"
-                          }
-                          2 -> {
-                              playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                              screenMode = 0
-                              button.text = "📱 FIT"
-                          }
+                          0 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM; screenMode = 1; button.text = "📱 ZOOM" }
+                          1 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL; screenMode = 2; button.text = "📱 STRETCH" }
+                          2 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT; screenMode = 0; button.text = "📱 FIT" }
                       }
                   }
 
-                  // 4. Audio Language Change (NEW)
+                  // FIX: Crash Proof Language Button
                   findViewById<Button>(R.id.btnLanguage).setOnClickListener {
-                      if (player != null && player!!.playbackState != ExoPlayer.STATE_IDLE) {
-                          val trackSelectionDialog = TrackSelectionDialogBuilder(
-                              this@MainActivity, "Select Audio Language", player!!, C.TRACK_TYPE_AUDIO
-                          ).build()
-                          trackSelectionDialog.show()
-                      } else {
-                          Toast.makeText(this@MainActivity, "Please play a movie first!", Toast.LENGTH_SHORT).show()
-                      }
+                      Toast.makeText(this@MainActivity, "⚙️ Click the Gear Icon on the video screen to change Audio/Language", Toast.LENGTH_LONG).show()
                   }
 
-                  // 5. Brightness Controller (NEW)
                   findViewById<Button>(R.id.btnBrightness).setOnClickListener { btn ->
                       val button = btn as Button
                       brightnessLevel -= 0.25f
-                      if (brightnessLevel < 0.25f) {
-                          brightnessLevel = 1.0f // Reset back to 100%
-                      }
-                      
+                      if (brightnessLevel < 0.25f) brightnessLevel = 1.0f 
                       val layoutParams = window.attributes
                       layoutParams.screenBrightness = brightnessLevel
                       window.attributes = layoutParams
-                      
                       button.text = "🔆 BRIGHT: ${(brightnessLevel * 100).toInt()}%"
                   }
               }
 
               private fun checkSystemStoragePermission() {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                      if (!Environment.isExternalStorageManager()) {
-                          showPermissionDialog()
-                      }
-                  }
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) { showPermissionDialog() }
               }
 
               private fun showPermissionDialog() {
                   AlertDialog.Builder(this)
-                      .setTitle("Special Settings Permission Required")
-                      .setMessage("To view and play heavy video layers smoothly without restriction, please toggle 'Allow management of all files' in the next Settings screen.")
+                      .setTitle("Permission Required")
+                      .setMessage("Please toggle 'Allow management of all files' in the next screen to play videos.")
                       .setCancelable(false)
                       .setPositiveButton("Go To Settings") { _, _ ->
                           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                               try {
                                   val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                                  intent.addCategory("android.intent.category.DEFAULT")
                                   intent.data = Uri.parse(String.format("package:%s", applicationContext.packageName))
                                   startActivity(intent)
-                              } catch (e: Exception) {
-                                  val intent = Intent()
-                                  intent.action = Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
-                                  startActivity(intent)
-                              }
+                              } catch (e: Exception) { startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
                           }
-                      }
-                      .show()
+                      }.show()
               }
 
               override fun onDestroy() {
@@ -391,3 +333,4 @@ jobs:
         with:
           name: "ZPlus-2-Video-Play-Engine"
           path: app/build/outputs/apk/debug/app-debug.apk
+
