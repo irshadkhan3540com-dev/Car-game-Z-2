@@ -1,4 +1,4 @@
-name: "Z+ 2 Video Play Engine - Ultimate VIP Release"
+name: "Z+ MP3 Music - Premium Edition + Z Menu"
 
 on:
   push:
@@ -9,487 +9,655 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: "Step 1: Checkout Repository"
+
+      - name: "1 ▸ Checkout Code"
         uses: actions/checkout@v4
 
-      - name: "Step 2: Setup Java 17 for Android Compiler"
+      - name: "2 ▸ Java 17 Setup"
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: "Step 3: Auto-Accept Android SDK Licenses"
+      - name: "3 ▸ Setup NDK & CMake (For C++ Engine)"
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;26.1.10909125" "cmake;3.22.1"
 
-      - name: "Step 4: Create Video Engine Directory Folders"
+      - name: "4 ▸ Create Premium Directory Structure"
         run: |
-          mkdir -p app/src/main/java/com/zatomic/videoengine
+          mkdir -p app/src/main/java/com/zatomic/mp3engine
+          mkdir -p app/src/main/cpp
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/mipmap-hdpi
           mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/menu
 
-      - name: "Step 5: Gradle Build System Configuration"
+      - name: "5 ▸ Gradle Project Files & Wrapper"
         run: |
           cat << 'EOF' > settings.gradle
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
-          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
-          rootProject.name = "ZPlus2VideoPlay"
+          dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+            repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "ZPlusMP3Music"
           include ':app'
           EOF
 
           cat << 'EOF' > build.gradle
-          plugins { id 'com.android.application' version '8.3.0' apply false; id 'org.jetbrains.kotlin.android' version '1.9.0' apply false }
+          plugins {
+            id 'com.android.application' version '8.3.0' apply false
+            id 'org.jetbrains.kotlin.android' version '1.9.0' apply false
+          }
           EOF
+          
+          gradle wrapper --gradle-version 8.4
 
-          cat << 'EOF' > gradle.properties
-          android.useAndroidX=true
-          org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8
-          EOF
-
-          gradle wrapper --gradle-version 8.4 --distribution-type bin
-
-      - name: "Step 6: Setup 100% Safe Vector Icon"
+      - name: "6 ▸ App build.gradle"
         run: |
-          cat << 'EOF' > app/src/main/res/drawable/ic_phone_player.xml
+          cat << 'EOF' > app/build.gradle
+          plugins {
+            id 'com.android.application'
+            id 'org.jetbrains.kotlin.android'
+          }
+          android {
+            namespace 'com.zatomic.mp3engine'
+            compileSdk 34
+            ndkVersion '26.1.10909125'
+            defaultConfig {
+              applicationId 'com.zatomic.mp3engine'
+              minSdk 26
+              targetSdk 34
+              versionCode 3
+              versionName "3.0-PremiumEngine"
+              externalNativeBuild {
+                cmake { cppFlags "-std=c++17" }
+              }
+            }
+            externalNativeBuild {
+              cmake { path "src/main/cpp/CMakeLists.txt" }
+            }
+            compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+            kotlinOptions { jvmTarget = '17' }
+            buildFeatures { viewBinding true }
+          }
+          dependencies {
+            implementation 'androidx.core:core-ktx:1.12.0'
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+            implementation 'com.google.android.material:material:1.11.0'
+            implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+            implementation 'androidx.media3:media3-exoplayer:1.3.0'
+            implementation 'androidx.media3:media3-session:1.3.0'
+            implementation 'androidx.media3:media3-ui:1.3.0'
+          }
+          EOF
+
+      - name: "7 ▸ C++ Audio Engine Setup (Native Code)"
+        run: |
+          cat << 'EOF' > app/src/main/cpp/CMakeLists.txt
+          cmake_minimum_required(VERSION 3.22.1)
+          project("torchengine")
+          add_library(torchengine SHARED native-lib.cpp)
+          find_library(log-lib log)
+          target_link_libraries(torchengine ${log-lib})
+          EOF
+
+          cat << 'EOF' > app/src/main/cpp/native-lib.cpp
+          #include <jni.h>
+          #include <cmath>
+          #include <android/log.h>
+
+          #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "TorchEngine_C++", __VA_ARGS__)
+          #ifndef M_PI
+          #define M_PI 3.14159265358979323846f
+          #endif
+
+          enum BeamMode { SPOT_5_DEG, TORCH_20_DEG, FLOOD_60_DEG };
+
+          class TorchAudioEngine {
+          private:
+              BeamMode currentMode;
+              float driveFactor;
+              float focusFrequency;
+              int sampleRate;
+              int preSweepSamples;
+              int globalSampleCounter;
+              bool isPlaybackStarted;
+              float filterState1;
+
+              float applyTrapezoidalShape(float sample) { return std::tanh(sample * driveFactor); }
+              float applyTransientFocus(float sample) {
+                  float out = sample * focusFrequency + (filterState1 * 0.1f);
+                  filterState1 = sample; 
+                  return out;
+              }
+              float generatePreSweepSignal(int sampleIndex) {
+                  float frequency = 15000.0f;
+                  float t = (float)sampleIndex / (float)sampleRate;
+                  float amplitudeEnvelope = std::sin(((float)sampleIndex / preSweepSamples) * M_PI) * 0.15f; 
+                  return std::sin(2.0f * M_PI * frequency * t) * amplitudeEnvelope;
+              }
+          public:
+              TorchAudioEngine(int sRate = 44100) {
+                  sampleRate = sRate;
+                  preSweepSamples = (int)(0.2f * sampleRate);
+                  globalSampleCounter = 0;
+                  filterState1 = 0.0f;
+                  isPlaybackStarted = false;
+                  setBeamMode(TORCH_20_DEG); 
+              }
+              void resetPlayback() {
+                  globalSampleCounter = 0;
+                  isPlaybackStarted = true;
+                  filterState1 = 0.0f;
+              }
+              void setBeamMode(BeamMode mode) {
+                  currentMode = mode;
+                  switch (mode) {
+                      case SPOT_5_DEG: driveFactor = 4.0f; focusFrequency = 1.8f; break;
+                      case TORCH_20_DEG: driveFactor = 2.5f; focusFrequency = 1.3f; break;
+                      case FLOOD_60_DEG: driveFactor = 1.0f; focusFrequency = 1.0f; break;
+                  }
+              }
+              void processAudio(float* buffer, int numFrames) {
+                  for (int i = 0; i < numFrames; ++i) {
+                      if (isPlaybackStarted && globalSampleCounter < preSweepSamples) {
+                          buffer[i] = generatePreSweepSignal(globalSampleCounter);
+                          globalSampleCounter++;
+                          continue; 
+                      } else { isPlaybackStarted = false; }
+
+                      float sample = buffer[i];
+                      sample = applyTransientFocus(sample);
+                      sample = applyTrapezoidalShape(sample);
+                      if (sample > 1.0f) sample = 1.0f;
+                      if (sample < -1.0f) sample = -1.0f;
+                      buffer[i] = sample;
+                      globalSampleCounter++;
+                  }
+              }
+          };
+
+          TorchAudioEngine* engine = nullptr;
+
+          extern "C" JNIEXPORT void JNICALL
+          Java_com_zatomic_mp3engine_NativeEngine_initEngine(JNIEnv* env, jobject thiz, jint sampleRate) {
+              if (engine != nullptr) delete engine;
+              engine = new TorchAudioEngine(sampleRate);
+          }
+
+          extern "C" JNIEXPORT void JNICALL
+          Java_com_zatomic_mp3engine_NativeEngine_setMode(JNIEnv* env, jobject thiz, jint mode) {
+              if (engine != nullptr) engine->setBeamMode(static_cast<BeamMode>(mode));
+          }
+
+          extern "C" JNIEXPORT void JNICALL
+          Java_com_zatomic_mp3engine_NativeEngine_resetPlayback(JNIEnv* env, jobject thiz) {
+              if (engine != nullptr) engine->resetPlayback();
+          }
+
+          extern "C" JNIEXPORT void JNICALL
+          Java_com_zatomic_mp3engine_NativeEngine_processAudioBuffer(JNIEnv* env, jobject thiz, jobject byteBuffer, jint numFrames) {
+              if (engine == nullptr) return;
+              float* buffer = (float*)env->GetDirectBufferAddress(byteBuffer);
+              if (buffer != nullptr) {
+                  engine->processAudio(buffer, numFrames);
+              }
+          }
+          EOF
+
+      - name: "8 ▸ Generate Premium Asset Folders & Icons (No Robot Images)"
+        run: |
+          cat << 'EOF' > app/src/main/res/values/colors.xml
+          <resources>
+            <color name="bg_primary">#0F1015</color>
+            <color name="accent_blue">#2F80ED</color>
+            <color name="text_white">#FFFFFF</color>
+            <color name="text_muted">#828282</color>
+            <color name="panel_bg">#1C1D24</color>
+            <color name="drawer_bg">#13141B</color>
+          </resources>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/values/strings.xml
+          <resources>
+            <string name="app_name">Z+ Samsung Music</string>
+          </resources>
+          EOF
+
+          # Ultra High Premium Launcher Icon (Disc + Music Wave Minimal Design)
+          cat << 'EOF' > app/src/main/res/mipmap-hdpi/ic_launcher.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="24dp" android:height="24dp"
-              android:viewportWidth="24" android:viewportHeight="24">
-              <path android:fillColor="#FF2196F3" android:pathData="M17,1H7C5.34,1 4,2.34 4,4v16c0,1.66 1.34,3 3,3h10c1.66,0 3,-1.34 3,-3V4c0,-1.66 -1.34,-3 -3,-3zM12,21c-0.55,0 -1,-0.45 -1,-1s0.45,-1 1,-1 1,0.45 1,1 -0.45,1 -1,1zM18,17H6V4h12v13z"/>
+              android:width="48dp" android:height="48dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#0F1015" android:pathData="M0,0h24v24H0z"/>
+              <path android:fillColor="#2F80ED" android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,17c-2.76,0 -5,-2.24 -5,-5s2.24,-5 5,-5 5,2.24 5,5 -2.24,5 -5,5z"/>
+              <path android:fillColor="#FFFFFF" android:pathData="M12,10c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z"/>
+              <path android:fillColor="#2F80ED" android:pathData="M4,11h2v2H4z M18,11h2v2h-2z M8,9h2v6H8z M14,9h2v6h-2z"/>
           </vector>
           EOF
 
-      - name: "Step 7: App Custom UI Layout - MX Player Style with Auto-Hide + Lock"
+          cat << 'EOF' > app/src/main/res/drawable/ic_mode_flood.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#2F80ED" android:pathData="M16,1H8C6.9,1 6,1.9 6,3v18c0,1.1 0.9,2 2,2h8c1.1,0 2,-0.9 2,-2V3c0,-1.1 -0.9,-2 -2,-2zM12,21c-0.55,0 -1,-0.45 -1,-1s0.45,-1 1,-1 1,0.45 1,1 -0.45,1 -1,1zM18,17H6V4h12v13z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_mode_torch.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#2F80ED" android:pathData="M3,9v6h4l5,5V4L7,9H3z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_mode_spot.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#2F80ED" android:pathData="M3,9v6h4l5,5V4L7,9H3z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_search.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#828282" android:pathData="M15.5,14h-.79l-.28-.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09-.59 4.23-1.57l.27.28v.79l5,4.99L20.49,19l-4.99-5zm-6,0C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_play.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#FFFFFF" android:pathData="M8,5v14l11-7z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/search_bg.xml
+          <shape xmlns:android="http://schemas.android.com/apk/res/android">
+            <solid android:color="#1C1D24"/>
+            <corners android:radius="25dp"/>
+          </shape>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/menu/drawer_menu.xml
+          <menu xmlns:android="http://schemas.android.com/apk/res/android">
+            <item android:title="Acoustic Engine Modes">
+              <menu>
+                <item android:id="@+id/mode_flood" android:icon="@drawable/ic_mode_flood" android:title="Flood Mode (60° Room)"/>
+                <item android:id="@+id/mode_torch" android:icon="@drawable/ic_mode_torch" android:title="Torch Mode (20° Medium)"/>
+                <item android:id="@+id/mode_spot" android:icon="@drawable/ic_mode_spot" android:title="Spot Mode (5° Straight)"/>
+              </menu>
+            </item>
+          </menu>
+          EOF
+
+      - name: "9 ▸ Layout Updates (Samsung Layout + Z Menu Drawer)"
         run: |
-          cat << 'EOF' > app/src/main/res/values/strings.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">Z+ 2 video play</string>
-          </resources>
-          EOF
-
-          cat << 'EOF' > app/src/main/res/values/colors.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <color name="black">#000000</color>
-              <color name="white">#FFFFFF</color>
-              <color name="player_red">#E50914</color>
-              <color name="brand_blue">#004AAD</color>
-          </resources>
-          EOF
-
-          # UPDATED: Fullscreen theme - no title bar, no status bar
-          cat << 'EOF' > app/src/main/res/values/themes.xml
-          <resources>
-              <style name="Theme.VideoEngine" parent="Theme.AppCompat.Light.NoActionBar">
-                  <item name="android:windowNoTitle">true</item>
-                  <item name="android:windowFullscreen">true</item>
-                  <item name="android:windowContentOverlay">@null</item>
-              </style>
-          </resources>
-          EOF
-
-          # UPDATED LAYOUT: Full screen PlayerView + hidden overlay controls + lock button
           cat << 'EOF' > app/src/main/res/layout/activity_main.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:background="@color/black">
+          <androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:id="@+id/drawerLayout"
+              android:layout_width="match_parent" android:layout_height="match_parent">
 
-              <!-- FULL SCREEN VIDEO PLAYER - No top/bottom constraints -->
-              <androidx.media3.ui.PlayerView
-                  android:id="@+id/playerView"
-                  android:layout_width="match_parent"
-                  android:layout_height="match_parent"/>
+              <androidx.constraintlayout.widget.ConstraintLayout
+                  android:layout_width="match_parent" android:layout_height="match_parent"
+                  android:background="@color/bg_primary">
 
-              <!-- LOCK BUTTON (Left side, center vertical) - Hidden by default -->
-              <Button
-                  android:id="@+id/btnLock"
-                  android:layout_width="52dp"
-                  android:layout_height="52dp"
-                  android:layout_centerVertical="true"
-                  android:layout_alignParentStart="true"
-                  android:layout_marginStart="14dp"
-                  android:text="🔓"
-                  android:textSize="22sp"
-                  android:padding="0dp"
-                  android:backgroundTint="#AA000000"
-                  android:visibility="gone"/>
-
-              <!-- BOTTOM CONTROLS BAR - Hidden by default, appears on tap -->
-              <LinearLayout
-                  android:id="@+id/bottomControllerBar"
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:orientation="vertical"
-                  android:layout_alignParentBottom="true"
-                  android:background="#CC000000"
-                  android:padding="10dp"
-                  android:visibility="gone">
-
-                  <LinearLayout
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:orientation="horizontal"
-                      android:layout_marginBottom="5dp">
-                      <Button android:id="@+id/btnSelectMovie"
-                          android:layout_width="0dp" android:layout_height="wrap_content"
-                          android:layout_weight="1" android:text="🎬 MOVIE"/>
-                      <Button android:id="@+id/btnAudioBoost"
-                          android:layout_width="0dp" android:layout_height="wrap_content"
-                          android:layout_weight="1" android:text="🔊 BOOST"
-                          android:layout_marginHorizontal="5dp"
-                          android:backgroundTint="@color/player_red"/>
-                      <Button android:id="@+id/btnFitScreen"
-                          android:layout_width="0dp" android:layout_height="wrap_content"
-                          android:layout_weight="1" android:text="📱 FIT"/>
+                  <LinearLayout android:id="@+id/searchContainer"
+                      android:layout_width="match_parent" android:layout_height="54dp"
+                      android:layout_margin="16dp" android:paddingHorizontal="12dp"
+                      android:background="@drawable/search_bg" android:orientation="horizontal"
+                      android:gravity="center_vertical" app:layout_constraintTop_toTopOf="parent">
+                      
+                      <Button android:id="@+id/btnZMenu" android:layout_width="40dp" android:layout_height="40dp" 
+                          android:text="Z" android:textSize="18sp" android:textStyle="bold" 
+                          android:textColor="#FFFFFF" android:backgroundTint="#22000000" android:layout_marginEnd="8dp"/>
+                          
+                      <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_search"/>
+                      
+                      <androidx.appcompat.widget.SearchView android:id="@+id/searchView"
+                          android:layout_width="match_parent" android:layout_height="wrap_content"
+                          app:iconifiedByDefault="false" app:queryBackground="@android:color/transparent"
+                          app:searchHintIcon="@null" app:queryHint="सैमसंग गानों में खोजें..."/>
                   </LinearLayout>
 
-                  <LinearLayout
-                      android:layout_width="match_parent"
-                      android:layout_height="wrap_content"
-                      android:orientation="horizontal">
-                      <Button android:id="@+id/btnLanguage"
-                          android:layout_width="0dp" android:layout_height="wrap_content"
-                          android:layout_weight="1" android:text="🌐 LANGUAGE"
-                          android:layout_marginEnd="5dp"/>
-                      <Button android:id="@+id/btnBrightness"
-                          android:layout_width="0dp" android:layout_height="wrap_content"
-                          android:layout_weight="1" android:text="🔆 BRIGHT: 100%"
-                          android:layout_marginStart="5dp"/>
-                  </LinearLayout>
-              </LinearLayout>
+                  <androidx.recyclerview.widget.RecyclerView android:id="@+id/rvAudio"
+                      android:layout_width="match_parent" android:layout_height="0dp"
+                      android:layout_marginTop="8dp" android:paddingBottom="80dp" android:clipToPadding="false"
+                      app:layout_constraintTop_toBottomOf="@id/searchContainer"
+                      app:layout_constraintBottom_toTopOf="@id/bottomPlayerBar"/>
 
-          </RelativeLayout>
+                  <LinearLayout android:id="@+id/bottomPlayerBar"
+                      android:layout_width="match_parent" android:layout_height="72dp"
+                      android:background="@color/panel_bg" android:orientation="horizontal"
+                      android:gravity="center_vertical" android:paddingHorizontal="16dp"
+                      app:layout_constraintBottom_toBottomOf="parent">
+
+                      <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                          android:layout_weight="1" android:orientation="vertical">
+                          <TextView android:id="@+id/tvCurrentTitle" android:layout_width="match_parent"
+                              android:layout_height="wrap_content" android:text="कोई गाना नहीं चल रहा"
+                              android:textColor="@color/text_white" android:textStyle="bold" android:textSize="15sp" android:maxLines="1"/>
+                          <TextView android:id="@+id/tvCurrentArtist" android:layout_width="match_parent"
+                              android:layout_height="wrap_content" android:text="Z+ Engine: Ready"
+                              android:textColor="@color/text_muted" android:textSize="12sp"/>
+                      </LinearLayout>
+
+                      <ImageButton android:id="@+id/btnPlayPause" android:layout_width="48dp" android:layout_height="48dp"
+                          android:src="@drawable/ic_play" android:background="?android:attr/selectableItemBackgroundBorderless"/>
+                  </LinearLayout>
+              </androidx.constraintlayout.widget.ConstraintLayout>
+
+              <com.google.android.material.navigation.NavigationView
+                  android:id="@+id/navView"
+                  android:layout_width="wrap_content" android:layout_height="match_parent"
+                  android:layout_gravity="start" android:background="@color/drawer_bg"
+                  app:itemTextColor="@color/text_white" app:itemIconTint="@color/accent_blue"
+                  app:menu="@menu/drawer_menu"/>
+
+          </androidx.drawerlayout.widget.DrawerLayout>
           EOF
 
+          cat << 'EOF' > app/src/main/res/layout/item_audio.xml
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="72dp"
+              android:orientation="horizontal" android:gravity="center_vertical"
+              android:paddingHorizontal="20dp" android:background="?android:attr/selectableItemBackground">
+              <View android:layout_width="46dp" android:layout_height="46dp"
+                  android:background="@color/panel_bg" android:layout_marginEnd="16dp"/>
+              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                  <TextView android:id="@+id/tvTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text_white" android:textSize="15sp" android:textStyle="bold" android:maxLines="1"/>
+                  <TextView android:id="@+id/tvFolder" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text_muted" android:textSize="12sp" android:layout_marginTop="4dp"/>
+              </LinearLayout>
+          </LinearLayout>
+          EOF
+
+      - name: "10 ▸ AndroidManifest (Launcher Icon Connected)"
+        run: |
           cat << 'EOF' > app/src/main/AndroidManifest.xml
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:tools="http://schemas.android.com/tools">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
-              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
-              <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage"/>
-              <application
-                  android:label="@string/app_name"
-                  android:icon="@drawable/ic_phone_player"
-                  android:theme="@style/Theme.VideoEngine"
+              <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              
+              <application 
+                  android:label="@string/app_name" 
+                  android:icon="@mipmap/ic_launcher"
+                  android:theme="@style/Theme.AppCompat.NoActionBar" 
                   android:requestLegacyExternalStorage="true">
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|layoutDirection">
+                  <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
                   </activity>
+                  <service android:name=".PlaybackService" android:exported="true"
+                      android:foregroundServiceType="mediaPlayback">
+                      <intent-filter>
+                          <action android:name="androidx.media3.session.MediaSessionService"/>
+                      </intent-filter>
+                  </service>
               </application>
           </manifest>
           EOF
 
-      - name: "Step 8: Inject Google Media3 Core Framework"
+      - name: "11 ▸ Kotlin Codebase Integration"
         run: |
-          cat << 'EOF' > app/build.gradle
-          plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
-          android {
-              namespace 'com.zatomic.videoengine'
-              compileSdk 34
-              defaultConfig { applicationId 'com.zatomic.videoengine'; minSdk 26; targetSdk 34; versionCode 5; versionName "5.0-VIP" }
-              compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-              kotlinOptions { jvmTarget = '17' }
-              lint { abortOnError false }
-          }
-          dependencies {
-              implementation 'androidx.core:core-ktx:1.12.0'
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'com.google.android.material:material:1.11.0'
-              implementation 'androidx.media3:media3-exoplayer:1.3.0'
-              implementation 'androidx.media3:media3-ui:1.3.0'
-              implementation 'androidx.media3:media3-session:1.3.0'
+          cat << 'EOF' > app/src/main/java/com/zatomic/mp3engine/NativeEngine.kt
+          package com.zatomic.mp3engine
+          import java.nio.ByteBuffer
+
+          object NativeEngine {
+              init { System.loadLibrary("torchengine") }
+              external fun initEngine(sampleRate: Int)
+              external fun setMode(mode: Int)
+              external fun resetPlayback()
+              external fun processAudioBuffer(buffer: ByteBuffer, numFrames: Int)
           }
           EOF
 
-      - name: "Step 9: Write Complete Kotlin Logic - Auto-Hide + Lock + Fullscreen"
-        run: |
-          cat << 'EOF' > app/src/main/java/com/zatomic/videoengine/MainActivity.kt
-          package com.zatomic.videoengine
+          cat << 'EOF' > app/src/main/java/com/zatomic/mp3engine/TorchAudioProcessor.kt
+          package com.zatomic.mp3engine
 
-          import android.annotation.SuppressLint
+          import androidx.media3.common.audio.AudioProcessor.AudioFormat
+          import androidx.media3.common.audio.BaseAudioProcessor
+          import java.nio.ByteBuffer
+          import java.nio.ByteOrder
+
+          class TorchAudioProcessor : BaseAudioProcessor() {
+              override fun onConfigure(inputAudioFormat: AudioFormat): AudioFormat {
+                  NativeEngine.initEngine(inputAudioFormat.sampleRate)
+                  return inputAudioFormat
+              }
+              override fun queueInput(inputBuffer: ByteBuffer) {
+                  val remaining = inputBuffer.remaining()
+                  if (remaining == 0) return
+                  val outputBuffer = replaceOutputBuffer(remaining)
+                  if (inputBuffer.isDirect) {
+                      val numFrames = remaining / (inputAudioFormat.channelCount * 4)
+                      NativeEngine.processAudioBuffer(inputBuffer, numFrames)
+                      outputBuffer.put(inputBuffer)
+                  } else {
+                      val bytes = ByteArray(remaining)
+                      inputBuffer.get(bytes)
+                      val directBuffer = ByteBuffer.allocateDirect(remaining).order(ByteOrder.nativeOrder())
+                      directBuffer.put(bytes)
+                      directBuffer.flip()
+                      val numFrames = remaining / (inputAudioFormat.channelCount * 4)
+                      NativeEngine.processAudioBuffer(directBuffer, numFrames)
+                      outputBuffer.put(directBuffer)
+                  }
+                  outputBuffer.flip()
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/zatomic/mp3engine/PlaybackService.kt
+          package com.zatomic.mp3engine
+
           import android.content.Intent
-          import android.media.audiofx.LoudnessEnhancer
-          import android.net.Uri
+          import androidx.media3.common.DefaultRenderersFactory
+          import androidx.media3.exoplayer.ExoPlayer
+          import androidx.media3.exoplayer.audio.DefaultAudioSink
+          import androidx.media3.session.MediaSession
+          import androidx.media3.session.MediaSessionService
+
+          class PlaybackService : MediaSessionService() {
+              private var mediaSession: MediaSession? = null
+              override fun onCreate() {
+                  super.onCreate()
+                  val audioProcessor = TorchAudioProcessor()
+                  val player = ExoPlayer.Builder(this)
+                      .setRenderersFactory(DefaultRenderersFactory(this).setAudioSinkProvider {
+                          DefaultAudioSink.Builder(this)
+                              .setAudioProcessors(arrayOf(audioProcessor))
+                              .build()
+                      })
+                      .build()
+                  mediaSession = MediaSession.Builder(this, player).build()
+              }
+              override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
+              override fun onDestroy() {
+                  mediaSession?.player?.release()
+                  mediaSession?.release()
+                  mediaSession = null
+                  super.onDestroy()
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/zatomic/mp3engine/AudioAdapter.kt
+          package com.zatomic.mp3engine
+          import android.view.LayoutInflater
+          import android.view.View
+          import android.view.ViewGroup
+          import android.widget.TextView
+          import androidx.recyclerview.widget.RecyclerView
+          import com.zatomic.mp3engine.R
+
+          data class AudioItem(val path: String, val name: String, val folder: String)
+
+          class AudioAdapter(private var fullList: List<AudioItem>, val onClick: (AudioItem) -> Unit) : RecyclerView.Adapter<AudioAdapter.VH>() {
+              private var filteredList = fullList.toList()
+
+              class VH(v: View): RecyclerView.ViewHolder(v) {
+                  val tvTitle: TextView = v.findViewById(R.id.tvTitle)
+                  val tvFolder: TextView = v.findViewById(R.id.tvFolder)
+              }
+              override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = VH(LayoutInflater.from(parent.context).inflate(R.layout.item_audio, parent, false))
+              override fun onBindViewHolder(holder: VH, position: Int) {
+                  val item = filteredList[position]
+                  holder.tvTitle.text = item.name
+                  holder.tvFolder.text = item.folder
+                  holder.itemView.setOnClickListener { onClick(item) }
+              }
+              override fun getItemCount() = filteredList.size
+
+              fun filter(query: String) {
+                  filteredList = if (query.isEmpty()) fullList else fullList.filter { it.name.contains(query, ignoreCase = true) }
+                  notifyDataSetChanged()
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/zatomic/mp3engine/MainActivity.kt
+          package com.zatomic.mp3engine
+
+          import android.Manifest
+          import android.content.ComponentName
+          import android.content.pm.PackageManager
           import android.os.Build
           import android.os.Bundle
-          import android.os.Environment
-          import android.os.Handler
-          import android.os.Looper
-          import android.provider.Settings
-          import android.view.GestureDetector
-          import android.view.MotionEvent
-          import android.view.View
-          import android.view.WindowInsets
-          import android.view.WindowInsetsController
+          import android.provider.MediaStore
           import android.widget.Button
-          import android.widget.LinearLayout
+          import android.widget.ImageButton
+          import android.widget.TextView
           import android.widget.Toast
           import androidx.activity.result.contract.ActivityResultContracts
-          import androidx.appcompat.app.AlertDialog
           import androidx.appcompat.app.AppCompatActivity
-          import androidx.media3.common.C
+          import androidx.appcompat.widget.SearchView
+          import androidx.core.content.ContextCompat
+          import androidx.core.view.GravityCompat
+          import androidx.drawerlayout.widget.DrawerLayout
           import androidx.media3.common.MediaItem
-          import androidx.media3.exoplayer.ExoPlayer
-          import androidx.media3.ui.AspectRatioFrameLayout
-          import androidx.media3.ui.PlayerView
+          import androidx.media3.common.Player
+          import androidx.media3.session.MediaController
+          import androidx.media3.session.SessionToken
+          import androidx.recyclerview.widget.LinearLayoutManager
+          import androidx.recyclerview.widget.RecyclerView
+          import com.google.android.material.navigation.NavigationView
+          import com.google.common.util.concurrent.MoreExecutors
+          import com.zatomic.mp3engine.R
 
           class MainActivity : AppCompatActivity() {
 
-              private var player: ExoPlayer? = null
-              private lateinit var playerView: PlayerView
-              private lateinit var bottomBar: LinearLayout
-              private lateinit var btnLock: Button
-              private var loudnessEnhancer: LoudnessEnhancer? = null
+              private var mediaController: MediaController? = null
+              private lateinit var adapter: AudioAdapter
+              private lateinit var drawerLayout: DrawerLayout
 
-              // Feature state variables
-              private var isBoosted = false
-              private var screenMode = 0
-              private var brightnessLevel = 1.0f
-              private var isLocked = false
-              private var isControlsVisible = false
+              private val reqPerm = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+                  if (it.values.any { granted -> granted }) loadAudioFiles()
+              }
 
-              // Auto-hide handler (3 second timer)
-              private val uiHandler = Handler(Looper.getMainLooper())
-              private val hideRunnable = Runnable { hideControls() }
-
-              // ─── Video Picker ──────────────────────────────────────────────
-              private val videoPicker =
-                  registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-                      uri?.let {
-                          val mediaItem = MediaItem.fromUri(it)
-                          player?.setMediaItem(mediaItem)
-                          player?.prepare()
-                          player?.play()
-                          player?.audioSessionId?.let { sid ->
-                              if (sid != C.AUDIO_SESSION_ID_UNSET) {
-                                  try { loudnessEnhancer = LoudnessEnhancer(sid) }
-                                  catch (e: Exception) { e.printStackTrace() }
-                              }
-                          }
-                      }
-                  }
-
-              // ─── onCreate ─────────────────────────────────────────────────
-              @SuppressLint("ClickableViewAccessibility")
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   setContentView(R.layout.activity_main)
+                  
+                  drawerLayout = findViewById(R.id.drawerLayout)
+                  findViewById<Button>(R.id.btnZMenu).setOnClickListener { 
+                      drawerLayout.openDrawer(GravityCompat.START) 
+                  }
 
-                  enableImmersiveFullScreen()
-                  checkSystemStoragePermission()
+                  val navView = findViewById<NavigationView>(R.id.navView)
+                  navView.setNavigationItemSelectedListener { item ->
+                      when (item.itemId) {
+                          R.id.mode_flood -> { NativeEngine.setMode(2); Toast.makeText(this,"Flood Mode Selected", Toast.LENGTH_SHORT).show() }
+                          R.id.mode_torch -> { NativeEngine.setMode(1); Toast.makeText(this,"Torch Mode Selected", Toast.LENGTH_SHORT).show() }
+                          R.id.mode_spot  -> { NativeEngine.setMode(0); Toast.makeText(this,"Spot Mode Selected", Toast.LENGTH_SHORT).show() }
+                      }
+                      drawerLayout.closeDrawer(GravityCompat.START)
+                      true
+                  }
 
-                  playerView = findViewById(R.id.playerView)
-                  bottomBar  = findViewById(R.id.bottomControllerBar)
-                  btnLock    = findViewById(R.id.btnLock)
+                  setupMediaController()
+                  checkPermissions()
+              }
 
-                  player = ExoPlayer.Builder(this).build()
-                  playerView.player = player
-
-                  // ── FEATURE 1: Tap-to-show / Auto-hide UI (3 seconds) ──
-                  val gestureDetector = GestureDetector(
-                      this,
-                      object : GestureDetector.SimpleOnGestureListener() {
-                          override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                              if (isLocked) {
-                                  // When locked: show only the Lock button for 3s
-                                  btnLock.visibility = View.VISIBLE
-                                  uiHandler.removeCallbacks(hideRunnable)
-                                  uiHandler.postDelayed(
-                                      { btnLock.visibility = View.GONE }, 3000
-                                  )
-                              } else {
-                                  toggleControls()
-                              }
-                              return true
+              private fun setupMediaController() {
+                  val sessionToken = SessionToken(this, ComponentName(this, PlaybackService::class.java))
+                  val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
+                  controllerFuture.addListener({
+                      mediaController = controllerFuture.get()
+                      mediaController?.addListener(object : Player.Listener {
+                          override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                              findViewById<TextView>(R.id.tvCurrentTitle).text = mediaItem?.mediaMetadata?.title ?: "Unknown Track"
                           }
-                      }
-                  )
-                  playerView.setOnTouchListener { _, event ->
-                      gestureDetector.onTouchEvent(event)
-                      false  // false = let ExoPlayer also handle the touch (play/pause)
-                  }
+                      })
+                  }, MoreExecutors.directExecutor())
 
-                  // ── FEATURE 2: Lock / Unlock Button ──
-                  btnLock.setOnClickListener {
-                      isLocked = !isLocked
-                      if (isLocked) {
-                          btnLock.text = "🔒"
-                          bottomBar.visibility = View.GONE
-                          isControlsVisible = false
-                          Toast.makeText(this, "🔒 Screen Locked", Toast.LENGTH_SHORT).show()
-                          uiHandler.removeCallbacks(hideRunnable)
-                          // Auto-hide lock button after 2s so screen is completely clean
-                          uiHandler.postDelayed({ btnLock.visibility = View.GONE }, 2000)
-                      } else {
-                          btnLock.text = "🔓"
-                          Toast.makeText(this, "🔓 Screen Unlocked", Toast.LENGTH_SHORT).show()
-                          showControls()
-                      }
-                  }
-
-                  // ── Buttons ──
-                  findViewById<Button>(R.id.btnSelectMovie).setOnClickListener {
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                          if (Environment.isExternalStorageManager()) videoPicker.launch("video/*")
-                          else showPermissionDialog()
-                      } else {
-                          videoPicker.launch("video/*")
-                      }
-                  }
-
-                  findViewById<Button>(R.id.btnAudioBoost).setOnClickListener { btn ->
-                      val button = btn as Button
-                      if (loudnessEnhancer != null) {
-                          try {
-                              if (!isBoosted) {
-                                  loudnessEnhancer?.enabled = true
-                                  loudnessEnhancer?.setTargetGain(5000)
-                                  isBoosted = true
-                                  button.text = "🔊 500% ON"
-                                  Toast.makeText(this, "🔥 Sound Engine Maxed!", Toast.LENGTH_SHORT).show()
-                              } else {
-                                  loudnessEnhancer?.setTargetGain(0)
-                                  loudnessEnhancer?.enabled = false
-                                  isBoosted = false
-                                  button.text = "🔊 BOOST"
-                              }
-                          } catch (e: Exception) {
-                              Toast.makeText(this, "Limit reached.", Toast.LENGTH_SHORT).show()
-                          }
-                      } else {
-                          Toast.makeText(this, "Please play a movie first!", Toast.LENGTH_SHORT).show()
-                      }
-                  }
-
-                  findViewById<Button>(R.id.btnFitScreen).setOnClickListener { btn ->
-                      val button = btn as Button
-                      when (screenMode) {
-                          0 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM;    screenMode = 1; button.text = "📱 ZOOM" }
-                          1 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL;    screenMode = 2; button.text = "📱 STRETCH" }
-                          2 -> { playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT;     screenMode = 0; button.text = "📱 FIT" }
-                      }
-                  }
-
-                  findViewById<Button>(R.id.btnLanguage).setOnClickListener {
-                      Toast.makeText(
-                          this,
-                          "⚙️ Click the Gear Icon on the video screen to change Audio/Language",
-                          Toast.LENGTH_LONG
-                      ).show()
-                  }
-
-                  findViewById<Button>(R.id.btnBrightness).setOnClickListener { btn ->
-                      val button = btn as Button
-                      brightnessLevel -= 0.25f
-                      if (brightnessLevel < 0.25f) brightnessLevel = 1.0f
-                      val lp = window.attributes
-                      lp.screenBrightness = brightnessLevel
-                      window.attributes = lp
-                      button.text = "🔆 BRIGHT: ${(brightnessLevel * 100).toInt()}%"
+                  findViewById<ImageButton>(R.id.btnPlayPause).setOnClickListener {
+                      mediaController?.let { if (it.isPlaying) it.pause() else it.play() }
                   }
               }
 
-              // ─── FEATURE 3: MX Player-style Immersive Full Screen ─────────
-              @SuppressLint("NewApi")
-              private fun enableImmersiveFullScreen() {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                      window.insetsController?.let { ctrl ->
-                          ctrl.hide(
-                              WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars()
-                          )
-                          ctrl.systemBarsBehavior =
-                              WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                      }
+              private fun checkPermissions() {
+                  val permissions = mutableListOf<String>()
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                      permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
+                      permissions.add(Manifest.permission.POST_NOTIFICATIONS)
                   } else {
-                      @Suppress("DEPRECATION")
-                      window.decorView.systemUiVisibility = (
-                          View.SYSTEM_UI_FLAG_FULLSCREEN          or
-                          View.SYSTEM_UI_FLAG_HIDE_NAVIGATION     or
-                          View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY    or
-                          View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN   or
-                          View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                      )
+                      permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+                  }
+                  
+                  if (permissions.all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }) {
+                      loadAudioFiles()
+                  } else {
+                      reqPerm.launch(permissions.toTypedArray())
                   }
               }
 
-              // Restore immersive mode when app regains focus (e.g. after dialog)
-              override fun onWindowFocusChanged(hasFocus: Boolean) {
-                  super.onWindowFocusChanged(hasFocus)
-                  if (hasFocus) enableImmersiveFullScreen()
-              }
-
-              // ─── Auto-Hide Helpers ─────────────────────────────────────────
-              private fun showControls() {
-                  if (isLocked) return
-                  bottomBar.visibility = View.VISIBLE
-                  btnLock.visibility   = View.VISIBLE
-                  isControlsVisible    = true
-                  uiHandler.removeCallbacks(hideRunnable)
-                  uiHandler.postDelayed(hideRunnable, 3000)   // Auto-hide after 3 seconds
-              }
-
-              private fun hideControls() {
-                  bottomBar.visibility = View.GONE
-                  btnLock.visibility   = View.GONE
-                  isControlsVisible    = false
-              }
-
-              private fun toggleControls() {
-                  if (isControlsVisible) hideControls() else showControls()
-              }
-
-              // ─── Permissions ───────────────────────────────────────────────
-              private fun checkSystemStoragePermission() {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
-                      !Environment.isExternalStorageManager()) {
-                      showPermissionDialog()
+              private fun loadAudioFiles() {
+                  val audioList = mutableListOf<AudioItem>()
+                  val proj = arrayOf(MediaStore.Audio.Media.DATA, MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.BUCKET_DISPLAY_NAME)
+                  contentResolver.query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, proj, null, null, MediaStore.Audio.Media.DATE_ADDED + " DESC")?.use { cursor ->
+                      while (cursor.moveToNext()) {
+                          audioList.add(AudioItem(cursor.getString(0) ?: "", cursor.getString(1) ?: "Unknown Track", cursor.getString(2) ?: "Storage"))
+                      }
                   }
-              }
 
-              private fun showPermissionDialog() {
-                  AlertDialog.Builder(this)
-                      .setTitle("Permission Required")
-                      .setMessage("Please toggle 'Allow management of all files' to play videos.")
-                      .setCancelable(false)
-                      .setPositiveButton("Go To Settings") { _, _ ->
-                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                              try {
-                                  val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                                  intent.data = Uri.parse("package:${applicationContext.packageName}")
-                                  startActivity(intent)
-                              } catch (e: Exception) {
-                                  startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
-                              }
-                          }
-                      }.show()
-              }
+                  adapter = AudioAdapter(audioList) { item ->
+                      NativeEngine.resetPlayback()
+                      mediaController?.setMediaItem(MediaItem.fromUri(item.path))
+                      mediaController?.prepare()
+                      mediaController?.play()
+                      findViewById<TextView>(R.id.tvCurrentTitle).text = item.name
+                      findViewById<TextView>(R.id.tvCurrentArtist).text = item.folder
+                  }
 
-              // ─── Cleanup ───────────────────────────────────────────────────
-              override fun onDestroy() {
-                  super.onDestroy()
-                  uiHandler.removeCallbacksAndMessages(null)
-                  player?.release()
-                  loudnessEnhancer?.release()
+                  val rv = findViewById<RecyclerView>(R.id.rvAudio)
+                  rv.layoutManager = LinearLayoutManager(this)
+                  rv.adapter = adapter
+
+                  findViewById<SearchView>(R.id.searchView).setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+                      override fun onQueryTextSubmit(query: String?) = false
+                      override fun onQueryTextChange(newText: String?): Boolean {
+                          adapter.filter(newText ?: "")
+                          return true
+                      }
+                  })
               }
           }
           EOF
 
-      - name: "Step 10: Compile Stable Video Engine Executable Binary"
-        run: |
-          chmod +x gradlew
-          ./gradlew :app:assembleDebug --no-daemon --info --stacktrace
+      - name: "12 ▸ Setup Gradle"
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
 
-      - name: "Step 11: Deploy Professional Target Package"
+      - name: "13 ▸ Build Updated Production APK"
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: "14 ▸ Upload Premium APK"
         uses: actions/upload-artifact@v4
         with:
-          name: "ZPlus-2-Video-Play-Engine-V5"
+          name: "ZPlus-SamsungEdition-WithMenu-V3"
           path: app/build/outputs/apk/debug/app-debug.apk
+
