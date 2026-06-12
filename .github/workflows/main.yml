@@ -453,9 +453,10 @@ jobs:
           cat << 'EOF' > app/src/main/java/com/zatomic/mp3engine/PlaybackService.kt
           package com.zatomic.mp3engine
 
-          import android.content.Intent
-          import androidx.media3.common.DefaultRenderersFactory
+          import android.content.Context
+          import androidx.media3.exoplayer.DefaultRenderersFactory
           import androidx.media3.exoplayer.ExoPlayer
+          import androidx.media3.exoplayer.audio.AudioSink
           import androidx.media3.exoplayer.audio.DefaultAudioSink
           import androidx.media3.session.MediaSession
           import androidx.media3.session.MediaSessionService
@@ -465,13 +466,24 @@ jobs:
               override fun onCreate() {
                   super.onCreate()
                   val audioProcessor = TorchAudioProcessor()
-                  val player = ExoPlayer.Builder(this)
-                      .setRenderersFactory(DefaultRenderersFactory(this).setAudioSinkProvider {
-                          DefaultAudioSink.Builder(this)
+                  
+                  // Correct way to inject Custom Audio Processors in Media3 ExoPlayer
+                  val renderersFactory = object : DefaultRenderersFactory(this) {
+                      override fun buildAudioSink(
+                          context: Context,
+                          enableFloatOutput: Boolean,
+                          enableAudioTrackPlaybackParams: Boolean
+                      ): AudioSink? {
+                          return DefaultAudioSink.Builder(context)
                               .setAudioProcessors(arrayOf(audioProcessor))
                               .build()
-                      })
+                      }
+                  }
+
+                  val player = ExoPlayer.Builder(this)
+                      .setRenderersFactory(renderersFactory)
                       .build()
+                      
                   mediaSession = MediaSession.Builder(this, player).build()
               }
               override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
