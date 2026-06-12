@@ -30,12 +30,18 @@ jobs:
           mkdir -p app/src/main/cpp
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/drawable
-          mkdir -p app/src/main/res/mipmap-hdpi
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/menu
 
-      - name: "5 ▸ Gradle Project Files & Wrapper"
+      - name: "5 ▸ Gradle Project Files & Wrapper Setup"
         run: |
+          # Step-by-step creating server properties to fix AndroidX Error
+          cat << 'EOF' > gradle.properties
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          EOF
+
           cat << 'EOF' > settings.gradle
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement {
@@ -54,6 +60,7 @@ jobs:
           EOF
           
           gradle wrapper --gradle-version 8.4
+          chmod +x gradlew
 
       - name: "6 ▸ App build.gradle"
         run: |
@@ -208,7 +215,7 @@ jobs:
           }
           EOF
 
-      - name: "8 ▸ Generate Premium Asset Folders & Icons (No Robot Images)"
+      - name: "8 ▸ Generate Premium Asset Folders & Icons"
         run: |
           cat << 'EOF' > app/src/main/res/values/colors.xml
           <resources>
@@ -227,8 +234,8 @@ jobs:
           </resources>
           EOF
 
-          # Ultra High Premium Launcher Icon (Disc + Music Wave Minimal Design)
-          cat << 'EOF' > app/src/main/res/mipmap-hdpi/ic_launcher.xml
+          # FIXED: Moved from mipmap-hdpi to drawable to prevent AAPT2 compilation crash
+          cat << 'EOF' > app/src/main/res/drawable/ic_launcher.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="48dp" android:height="48dp" android:viewportWidth="24" android:viewportHeight="24">
               <path android:fillColor="#0F1015" android:pathData="M0,0h24v24H0z"/>
@@ -368,7 +375,7 @@ jobs:
           </LinearLayout>
           EOF
 
-      - name: "10 ▸ AndroidManifest (Launcher Icon Connected)"
+      - name: "10 ▸ AndroidManifest (Launcher Icon Re-connected to Drawable)"
         run: |
           cat << 'EOF' > app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -380,7 +387,7 @@ jobs:
               
               <application 
                   android:label="@string/app_name" 
-                  android:icon="@mipmap/ic_launcher"
+                  android:icon="@drawable/ic_launcher"
                   android:theme="@style/Theme.AppCompat.NoActionBar" 
                   android:requestLegacyExternalStorage="true">
                   <activity android:name=".MainActivity" android:exported="true">
@@ -467,7 +474,6 @@ jobs:
                   super.onCreate()
                   val audioProcessor = TorchAudioProcessor()
                   
-                  // Correct way to inject Custom Audio Processors in Media3 ExoPlayer
                   val renderersFactory = object : DefaultRenderersFactory(this) {
                       override fun buildAudioSink(
                           context: Context,
@@ -665,7 +671,9 @@ jobs:
           gradle-version: '8.4'
 
       - name: "13 ▸ Build Updated Production APK"
-        run: ./gradlew :app:assembleDebug --no-daemon
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon
 
       - name: "14 ▸ Upload Premium APK"
         uses: actions/upload-artifact@v4
