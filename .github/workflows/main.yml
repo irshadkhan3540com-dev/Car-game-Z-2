@@ -24,7 +24,6 @@ jobs:
 
       - name: 4. Create Complete Project Structure
         run: |
-          # Main folders banate hain
           mkdir -p app/src/main/java/com/example/btcaller/{ui,utils}
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/layout
@@ -33,7 +32,6 @@ jobs:
           mkdir -p app/src/main/res/mipmap-xhdpi
           mkdir -p app/src/main/res/mipmap-xxhdpi
           
-          # Root config files
           echo "pluginManagement {
               repositories {
                   google()
@@ -114,10 +112,6 @@ jobs:
               implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
               implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
               implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
-              
-              testImplementation 'junit:junit:4.13.2'
-              androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-              androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
           }
           GRADLE_EOF
 
@@ -163,7 +157,7 @@ jobs:
                   }
 
                   val btnScan = Button(this).apply {
-                      text = "à¤†à¤¸-à¤ªà¤¾à¤¸ à¤•à¥‡ à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤–à¥‹à¤œà¥‡à¤‚"
+                      text = "आस-पास के डिवाइस खोजें"
                       textSize = 16f
                       height = 120
                   }
@@ -185,7 +179,7 @@ jobs:
                   bluetoothAdapter = bluetoothManager.adapter
 
                   if (bluetoothAdapter == null) {
-                      Toast.makeText(this, "à¤‡à¤¸ à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤®à¥‡à¤‚ à¤¬à¥à¤²à¥‚à¤Ÿà¥‚à¤¥ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ", Toast.LENGTH_LONG).show()
+                      Toast.makeText(this, "इस डिवाइस में ब्लूटूथ उपलब्ध नहीं है", Toast.LENGTH_LONG).show()
                       finish()
                       return
                   }
@@ -209,7 +203,7 @@ jobs:
 
                   listView.setOnItemClickListener { _, _, position, _ ->
                       val device = discoveredDevices[position]
-                      Toast.makeText(this, "à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤•à¤° à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚: ${device.name ?: device.address}", Toast.LENGTH_SHORT).show()
+                      Toast.makeText(this, "कनेक्ट कर रहे हैं: ${device.name ?: device.address}", Toast.LENGTH_SHORT).show()
                       
                       val intent = Intent(this, CallActivity::class.java).apply {
                           putExtra("device_address", device.address)
@@ -232,7 +226,7 @@ jobs:
                           bluetoothAdapter?.cancelDiscovery()
                       }
                       bluetoothAdapter?.startDiscovery()
-                      Toast.makeText(this, "à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤–à¥‹à¤œà¤¨à¤¾ à¤¶à¥à¤°à¥‚...", Toast.LENGTH_SHORT).show()
+                      Toast.makeText(this, "डिवाइस खोजना शुरू...", Toast.LENGTH_SHORT).show()
                   }
               }
 
@@ -290,7 +284,7 @@ jobs:
                       if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                           startScanning()
                       } else {
-                          Toast.makeText(this, "à¤ªà¤°à¤®à¤¿à¤¶à¤¨ à¤¦à¥‡à¤¨à¥€ à¤œà¤°à¥‚à¤°à¥€ à¤¹à¥ˆ", Toast.LENGTH_SHORT).show()
+                          Toast.makeText(this, "परमिशन देनी जरूरी है", Toast.LENGTH_SHORT).show()
                       }
                   }
               }
@@ -317,7 +311,6 @@ jobs:
           import android.bluetooth.BluetoothSocket
           import android.content.pm.PackageManager
           import android.media.AudioManager
-          import android.os.Build
           import android.os.Bundle
           import android.widget.Button
           import android.widget.LinearLayout
@@ -354,30 +347,30 @@ jobs:
                   }
 
                   statusText = TextView(this).apply {
-                      text = "à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤¸à¥‡ à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤¹à¥‹ à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚..."
+                      text = "डिवाइस से कनेक्ट हो रहे हैं..."
                       textSize = 18f
                   }
 
                   btnConnect = Button(this).apply {
-                      text = "à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤•à¤°à¥‡à¤‚"
+                      text = "कनेक्ट करें"
                       textSize = 14f
                       height = 100
                   }
 
                   btnMute = Button(this).apply {
-                      text = "ðŸ”Š à¤®à¥à¤¯à¥‚à¤Ÿ à¤¨à¤¹à¥€à¤‚"
+                      text = "🔊 म्यूट नहीं"
                       textSize = 14f
                       height = 100
                   }
 
                   btnSpeaker = Button(this).apply {
-                      text = "ðŸ”ˆ à¤¸à¥à¤ªà¥€à¤•à¤°"
+                      text = "🔈 स्पीकर"
                       textSize = 14f
                       height = 100
                   }
 
                   btnEndCall = Button(this).apply {
-                      text = "à¤•à¥‰à¤² à¤¸à¤®à¤¾à¤ªà¥à¤¤ à¤•à¤°à¥‡à¤‚"
+                      text = "कॉल समाप्त करें"
                       textSize = 14f
                       height = 100
                   }
@@ -398,7 +391,7 @@ jobs:
 
                   if (deviceAddress != null) {
                       device = bluetoothAdapter?.getRemoteDevice(deviceAddress)
-                      statusText.text = "à¤¡à¤¿à¤µà¤¾à¤‡à¤¸: $deviceName\nà¤¸à¥à¤Ÿà¥‡à¤Ÿà¤¸: à¤¤à¥ˆà¤¯à¤¾à¤°"
+                      statusText.text = "डिवाइस: $deviceName\nस्टेटस: तैयार"
                       btnConnect.performClick()
                   }
 
@@ -425,7 +418,7 @@ jobs:
 
               private fun connectDevice() {
                   if (device == null) {
-                      Toast.makeText(this, "à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾", Toast.LENGTH_SHORT).show()
+                      Toast.makeText(this, "डिवाइस नहीं मिला", Toast.LENGTH_SHORT).show()
                       return
                   }
 
@@ -443,16 +436,16 @@ jobs:
 
                               isConnected = true
                               runOnUiThread {
-                                  statusText.text = "âœ“ à¤•à¤¨à¥‡à¤•à¥à¤Ÿà¥‡à¤¡\nà¤•à¥‰à¤² à¤¸à¤•à¥à¤°à¤¿à¤¯ à¤¹à¥ˆ..."
-                                  btnConnect.text = "à¤¡à¤¿à¤¸à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤•à¤°à¥‡à¤‚"
-                                  Toast.makeText(this@CallActivity, "à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤¹à¥‹ à¤—à¤!", Toast.LENGTH_SHORT).show()
+                                  statusText.text = "✓ कनेक्टेड\nकॉल सक्रिय है..."
+                                  btnConnect.text = "डिस्कनेक्ट करें"
+                                  Toast.makeText(this@CallActivity, "कनेक्ट हो गए!", Toast.LENGTH_SHORT).show()
                               }
                           }
                       } catch (e: IOException) {
                           isConnected = false
                           runOnUiThread {
-                              statusText.text = "âœ— à¤•à¤¨à¥‡à¤•à¥à¤¶à¤¨ à¤µà¤¿à¤«à¤²\n${e.message}"
-                              Toast.makeText(this@CallActivity, "à¤•à¤¨à¥‡à¤•à¥à¤¶à¤¨ à¤µà¤¿à¤«à¤²: ${e.message}", Toast.LENGTH_SHORT).show()
+                              statusText.text = "✕ कनेक्शन विफल\n${e.message}"
+                              Toast.makeText(this@CallActivity, "कनेक्शन विफल: ${e.message}", Toast.LENGTH_SHORT).show()
                           }
                       }
                   }.start()
@@ -465,16 +458,16 @@ jobs:
                           bluetoothSocket = null
                       }
                       isConnected = false
-                      statusText.text = "à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤¸à¥‡ à¤¡à¤¿à¤¸à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤¹à¥‹ à¤—à¤"
-                      btnConnect.text = "à¤¦à¥‹à¤¬à¤¾à¤°à¤¾ à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤•à¤°à¥‡à¤‚"
+                      statusText.text = "डिवाइस से डिस्कनेक्ट हो गए"
+                      btnConnect.text = "दोबारा कनेक्ट करें"
                   } catch (e: IOException) {
-                      Toast.makeText(this, "à¤¡à¤¿à¤¸à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤¤à¥à¤°à¥à¤Ÿà¤¿: ${e.message}", Toast.LENGTH_SHORT).show()
+                      Toast.makeText(this, "डिस्कनेक्ट त्रुटि: ${e.message}", Toast.LENGTH_SHORT).show()
                   }
               }
 
               private fun toggleMute() {
                   if (!isConnected) {
-                      Toast.makeText(this, "à¤ªà¤¹à¤²à¥‡ à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤•à¤°à¥‡à¤‚", Toast.LENGTH_SHORT).show()
+                      Toast.makeText(this, "पहले कनेक्ट करें", Toast.LENGTH_SHORT).show()
                       return
                   }
 
@@ -482,19 +475,19 @@ jobs:
                   val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
 
                   if (isMuted) {
-                      audioManager.setMicrophoneMute(true)
-                      btnMute.text = "ðŸ”‡ à¤®à¥à¤¯à¥‚à¤Ÿ"
-                      Toast.makeText(this, "à¤®à¤¾à¤‡à¤• à¤®à¥à¤¯à¥‚à¤Ÿ à¤¹à¥‹ à¤—à¤¯à¤¾", Toast.LENGTH_SHORT).show()
+                      audioManager.isMicrophoneMute = true
+                      btnMute.text = "🔇 म्यूट"
+                      Toast.makeText(this, "माइक म्यूट हो गया", Toast.LENGTH_SHORT).show()
                   } else {
-                      audioManager.setMicrophoneMute(false)
-                      btnMute.text = "ðŸ”Š à¤®à¥à¤¯à¥‚à¤Ÿ à¤¨à¤¹à¥€à¤‚"
-                      Toast.makeText(this, "à¤®à¤¾à¤‡à¤• à¤¸à¤•à¥à¤°à¤¿à¤¯", Toast.LENGTH_SHORT).show()
+                      audioManager.isMicrophoneMute = false
+                      btnMute.text = "🔊 म्यूट नहीं"
+                      Toast.makeText(this, "माइक सक्रिय", Toast.LENGTH_SHORT).show()
                   }
               }
 
               private fun toggleSpeaker() {
                   if (!isConnected) {
-                      Toast.makeText(this, "à¤ªà¤¹à¤²à¥‡ à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤•à¤°à¥‡à¤‚", Toast.LENGTH_SHORT).show()
+                      Toast.makeText(this, "पहले कनेक्ट करें", Toast.LENGTH_SHORT).show()
                       return
                   }
 
@@ -502,20 +495,20 @@ jobs:
                   val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
 
                   if (isOnSpeaker) {
-                      audioManager.speakerphoneOn = true
-                      btnSpeaker.text = "ðŸ”‰ à¤¸à¥à¤ªà¥€à¤•à¤° à¤‘à¤¨"
-                      Toast.makeText(this, "à¤¸à¥à¤ªà¥€à¤•à¤° à¤‘à¤¨", Toast.LENGTH_SHORT).show()
+                      audioManager.isSpeakerphoneOn = true
+                      btnSpeaker.text = "🔉 स्पीकर ऑन"
+                      Toast.makeText(this, "स्पीकर ऑन", Toast.LENGTH_SHORT).show()
                   } else {
-                      audioManager.speakerphoneOn = false
-                      btnSpeaker.text = "ðŸ”ˆ à¤¸à¥à¤ªà¥€à¤•à¤° à¤‘à¤«"
-                      Toast.makeText(this, "à¤¸à¥à¤ªà¥€à¤•à¤° à¤‘à¤«", Toast.LENGTH_SHORT).show()
+                      audioManager.isSpeakerphoneOn = false
+                      btnSpeaker.text = "🔈 स्पीकर ऑफ"
+                      Toast.makeText(this, "स्पीकर ऑफ", Toast.LENGTH_SHORT).show()
                   }
               }
 
               private fun endCall() {
                   disconnectDevice()
-                  statusText.text = "à¤•à¥‰à¤² à¤¸à¤®à¤¾à¤ªà¥à¤¤ à¤¹à¥à¤†"
-                  Toast.makeText(this, "à¤•à¥‰à¤² à¤–à¤¤à¥à¤®", Toast.LENGTH_SHORT).show()
+                  statusText.text = "कॉल समाप्त हुआ"
+                  Toast.makeText(this, "कॉल ख़त्म", Toast.LENGTH_SHORT).show()
                   
                   Thread {
                       Thread.sleep(1000)
@@ -603,7 +596,7 @@ jobs:
                   Thread {
                       try {
                           if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                              callback(false, "à¤ªà¤°à¤®à¤¿à¤¶à¤¨ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ")
+                              callback(false, "परमिशन नहीं है")
                               return@Thread
                           }
 
@@ -612,10 +605,10 @@ jobs:
                           bluetoothSocket?.connect()
 
                           isConnected = true
-                          callback(true, "à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤¹à¥‹ à¤—à¤")
+                          callback(true, "कनेक्ट हो गए")
                       } catch (e: IOException) {
                           isConnected = false
-                          callback(false, "à¤•à¤¨à¥‡à¤•à¥à¤¶à¤¨ à¤µà¤¿à¤«à¤²: ${e.message}")
+                          callback(false, "कनेक्शन विफल: ${e.message}")
                       }
                   }.start()
               }
@@ -643,7 +636,7 @@ jobs:
                           false
                       }
                   } catch (e: IOException) {
-                      false
+                          false
                   }
               }
           }
@@ -680,9 +673,9 @@ jobs:
               <application
                   android:allowBackup="true"
                   android:debuggable="true"
-                  android:icon="@mipmap/ic_launcher"
+                  android:icon="@android:drawable/sym_def_app_icon"
                   android:label="@string/app_name"
-                  android:roundIcon="@mipmap/ic_launcher_round"
+                  android:roundIcon="@android:drawable/sym_def_app_icon"
                   android:supportsRtl="true"
                   android:theme="@style/Theme.AppCompat.Light.DarkActionBar"
                   tools:targetApi="31">
@@ -699,7 +692,7 @@ jobs:
                   <activity
                       android:name=".ui.CallActivity"
                       android:exported="false"
-                      android:label="à¤•à¥‰à¤² à¤à¤•à¥à¤Ÿà¤¿à¤µà¤¿à¤Ÿà¥€" />
+                      android:label="कॉल एक्टिविटी" />
 
               </application>
 
@@ -712,37 +705,37 @@ jobs:
           <resources>
               <string name="app_name">BT Caller</string>
               
-              <string name="btn_scan_devices">à¤†à¤¸-à¤ªà¤¾à¤¸ à¤•à¥‡ à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤–à¥‹à¤œà¥‡à¤‚</string>
-              <string name="bluetooth_not_available">à¤‡à¤¸ à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤®à¥‡à¤‚ à¤¬à¥à¤²à¥‚à¤Ÿà¥‚à¤¥ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ</string>
-              <string name="scanning_devices">à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤–à¥‹à¤œà¤¨à¤¾ à¤¶à¥à¤°à¥‚...</string>
-              <string name="connecting_to">à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤•à¤° à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚</string>
-              <string name="permission_required">à¤ªà¤°à¤®à¤¿à¤¶à¤¨ à¤¦à¥‡à¤¨à¥€ à¤œà¤°à¥‚à¤°à¥€ à¤¹à¥ˆ</string>
+              <string name="btn_scan_devices">आस-पास के डिवाइस खोजें</string>
+              <string name="bluetooth_not_available">इस डिवाइस में ब्लूटूथ उपलब्ध नहीं है</string>
+              <string name="scanning_devices">डिवाइस खोजना शुरू...</string>
+              <string name="connecting_to">कनेक्ट कर रहे हैं</string>
+              <string name="permission_required">परमिशन देनी जरूरी है</string>
               <string name="unknown_device">Unknown Device</string>
               
-              <string name="device_connecting">à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤¸à¥‡ à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤¹à¥‹ à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...</string>
-              <string name="device_not_found">à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾</string>
-              <string name="connection_failed">à¤•à¤¨à¥‡à¤•à¥à¤¶à¤¨ à¤µà¤¿à¤«à¤²</string>
-              <string name="device_connected">à¤•à¤¨à¥‡à¤•à¥à¤Ÿà¥‡à¤¡ - à¤•à¥‰à¤² à¤¸à¤•à¥à¤°à¤¿à¤¯ à¤¹à¥ˆ</string>
-              <string name="connected">à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤¹à¥‹ à¤—à¤!</string>
-              <string name="disconnected">à¤¡à¤¿à¤µà¤¾à¤‡à¤¸ à¤¸à¥‡ à¤¡à¤¿à¤¸à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤¹à¥‹ à¤—à¤</string>
-              <string name="reconnect">à¤¦à¥‹à¤¬à¤¾à¤°à¤¾ à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤•à¤°à¥‡à¤‚</string>
-              <string name="disconnect">à¤¡à¤¿à¤¸à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤•à¤°à¥‡à¤‚</string>
+              <string name="device_connecting">डिवाइस से कनेक्ट हो रहे हैं...</string>
+              <string name="device_not_found">डिवाइस नहीं मिला</string>
+              <string name="connection_failed">कनेक्शन विफल</string>
+              <string name="device_connected">कनेक्टेड - कॉल सक्रिय है</string>
+              <string name="connected">कनेक्ट हो गए!</string>
+              <string name="disconnected">डिवाइस से डिस्कनेक्ट हो गए</string>
+              <string name="reconnect">दोबारा कनेक्ट करें</string>
+              <string name="disconnect">डिस्कनेक्ट करें</string>
               
-              <string name="btn_connect">à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤•à¤°à¥‡à¤‚</string>
-              <string name="btn_mute">ðŸ”Š à¤®à¥à¤¯à¥‚à¤Ÿ à¤¨à¤¹à¥€à¤‚</string>
-              <string name="btn_mute_on">ðŸ”‡ à¤®à¥à¤¯à¥‚à¤Ÿ</string>
-              <string name="btn_speaker">ðŸ”ˆ à¤¸à¥à¤ªà¥€à¤•à¤°</string>
-              <string name="btn_speaker_on">ðŸ”‰ à¤¸à¥à¤ªà¥€à¤•à¤° à¤‘à¤¨</string>
-              <string name="btn_speaker_off">ðŸ”ˆ à¤¸à¥à¤ªà¥€à¤•à¤° à¤‘à¤«</string>
-              <string name="btn_end_call">à¤•à¥‰à¤² à¤¸à¤®à¤¾à¤ªà¥à¤¤ à¤•à¤°à¥‡à¤‚</string>
+              <string name="btn_connect">कनेक्ट करें</string>
+              <string name="btn_mute">🔊 म्यूट नहीं</string>
+              <string name="btn_mute_on">🔇 म्यूट</string>
+              <string name="btn_speaker">🔈 स्पीकर</string>
+              <string name="btn_speaker_on">🔉 स्पीकर ऑन</string>
+              <string name="btn_speaker_off">🔈 स्पीकर ऑफ</string>
+              <string name="btn_end_call">कॉल समाप्त करें</string>
               
-              <string name="status_muted">à¤®à¤¾à¤‡à¤• à¤®à¥à¤¯à¥‚à¤Ÿ à¤¹à¥‹ à¤—à¤¯à¤¾</string>
-              <string name="status_unmuted">à¤®à¤¾à¤‡à¤• à¤¸à¤•à¥à¤°à¤¿à¤¯</string>
-              <string name="status_speaker_on">à¤¸à¥à¤ªà¥€à¤•à¤° à¤‘à¤¨</string>
-              <string name="status_speaker_off">à¤¸à¥à¤ªà¥€à¤•à¤° à¤‘à¤«</string>
-              <string name="status_call_ended">à¤•à¥‰à¤² à¤–à¤¤à¥à¤®</string>
-              <string name="status_call_disconnected">à¤•à¥‰à¤² à¤¸à¤®à¤¾à¤ªà¥à¤¤ à¤¹à¥à¤†</string>
-              <string name="connect_first">à¤ªà¤¹à¤²à¥‡ à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤•à¤°à¥‡à¤‚</string>
+              <string name="status_muted">माइक म्यूट हो गया</string>
+              <string name="status_unmuted">माइक सक्रिय</string>
+              <string name="status_speaker_on">स्पीकर ऑन</string>
+              <string name="status_speaker_off">स्पीकर ऑफ</string>
+              <string name="status_call_ended">कॉल ख़त्म</string>
+              <string name="status_call_disconnected">कॉल समाप्त हुआ</string>
+              <string name="connect_first">पहले कनेक्ट करें</string>
           </resources>
           STRINGS_EOF
 
@@ -766,108 +759,9 @@ jobs:
         run: |
           ./gradlew assembleDebug --stacktrace
 
-      - name: 15. Build Release APK (Unsigned)
-        run: |
-          ./gradlew assembleRelease --stacktrace || true
-
-      - name: 16. List Build Outputs
-        run: |
-          ls -la app/build/outputs/apk/debug/ || true
-          ls -la app/build/outputs/apk/release/ || true
-
-      - name: 17. Upload Debug APK
+      - name: 15. Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: BTCaller-Debug-APK
           path: app/build/outputs/apk/debug/app-debug.apk
 
-      - name: 18. Create Build Summary
-        run: |
-          cat > BUILD_SUMMARY.md << 'SUMMARY_EOF'
-          # ðŸŽ‰ Bluetooth Calling App - Build Complete
-
-          ## âœ… Build Status: SUCCESS
-
-          ### ðŸ“± App Details
-          - **Name:** BT Caller
-          - **Package:** com.example.btcaller
-          - **Version:** 1.0
-          - **Min SDK:** 21
-          - **Target SDK:** 34
-          - **Build Type:** Debug
-
-          ### ðŸ“¦ APK Information
-          - **Location:** `app/build/outputs/apk/debug/app-debug.apk`
-          - **Type:** Debug APK (Unsigned)
-          - **Size:** Check artifact download
-
-          ### âœ¨ Features Included
-          âœ… Bluetooth Device Discovery
-          âœ… Device Connection Management
-          âœ… Call Activity with Controls
-          âœ… Mute/Unmute Functionality
-          âœ… Speaker Control
-          âœ… Call Termination
-          âœ… Hindi Language Support
-          âœ… Android 12+ Permissions
-          âœ… Dynamic UI
-
-          ### ðŸ“ Source Files
-          - `MainActivity.kt` - Device Discovery
-          - `CallActivity.kt` - Call Management
-          - `BluetoothManager.kt` - Helper Utility
-          - `AndroidManifest.xml` - Configuration
-          - `strings.xml` - Resources
-
-          ### ðŸš€ Installation
-          1. Download the APK from artifacts
-          2. Enable Unknown Sources in Settings
-          3. Install APK on Physical Device
-          4. Run the app
-
-          ### âš ï¸ Important Notes
-          - Physical Bluetooth Device Required
-          - Runtime Permissions Needed
-          - Enable Bluetooth in Settings
-          - Use Real Android Device (Not Emulator)
-
-          ### ðŸ“š Project Structure
-          ```
-          app/
-          â”œâ”€â”€ src/main/java/com/example/btcaller/
-          â”‚   â”œâ”€â”€ ui/
-          â”‚   â”‚   â”œâ”€â”€ MainActivity.kt
-          â”‚   â”‚   â””â”€â”€ CallActivity.kt
-          â”‚   â””â”€â”€ utils/
-          â”‚       â””â”€â”€ BluetoothManager.kt
-          â”œâ”€â”€ src/main/res/
-          â”‚   â””â”€â”€ values/
-          â”‚       â””â”€â”€ strings.xml
-          â””â”€â”€ build.gradle
-          ```
-
-          ### ðŸ” Permissions
-          - BLUETOOTH
-          - BLUETOOTH_ADMIN
-          - BLUETOOTH_SCAN (Android 12+)
-          - BLUETOOTH_CONNECT (Android 12+)
-          - ACCESS_FINE_LOCATION
-          - RECORD_AUDIO
-          - MODIFY_AUDIO_SETTINGS
-
-          ---
-          **Built with â¤ï¸ using GitHub Actions**
-          SUMMARY_EOF
-
-      - name: 19. Upload Build Summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: Build-Summary
-          path: BUILD_SUMMARY.md
-
-      - name: 20. Success Notification
-        if: success()
-        run: |
-          echo "âœ… Build Successful!"
-          echo "ðŸ“¦ APK Ready for Download"
-          echo "ðŸŽ‰ Bluetooth Calling App Built Successfully"
