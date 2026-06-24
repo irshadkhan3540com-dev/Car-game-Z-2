@@ -22,15 +22,22 @@ jobs:
       - name: 3. Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: 4. Create Complete Project Structure
+      - name: 4. Create Complete Project Structure & Default Assets
         run: |
           mkdir -p app/src/main/java/com/example/btcaller/{ui,utils}
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/layout
-          mkdir -p app/src/main/res/mipmap-hdpi
-          mkdir -p app/src/main/res/mipmap-mdpi
-          mkdir -p app/src/main/res/mipmap-xhdpi
-          mkdir -p app/src/main/res/mipmap-xxhdpi
+          mkdir -p app/src/main/res/drawable
+          
+          echo '<vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path
+                  android:fillColor="#0066FF"
+                  android:pathData="M0,0h108v108h-108z"/>
+          </vector>' > app/src/main/res/drawable/ic_app_logo.xml
           
           echo "pluginManagement {
               repositories {
@@ -63,12 +70,12 @@ jobs:
           }
           GRADLE_EOF
 
-      - name: 6. Write App build.gradle (Complete)
+      - name: 6. Write App build.gradle
         run: |
           cat > app/build.gradle << 'GRADLE_EOF'
           plugins {
               id 'com.android.application'
-              id 'kotlin-android'
+              id 'org.jetbrains.kotlin.android'
           }
 
           android {
@@ -99,10 +106,6 @@ jobs:
               kotlinOptions {
                   jvmTarget = '1.8'
               }
-
-              buildFeatures {
-                  viewBinding false
-              }
           }
 
           dependencies {
@@ -115,7 +118,7 @@ jobs:
           }
           GRADLE_EOF
 
-      - name: 7. Write MainActivity.kt (Bluetooth Discovery)
+      - name: 7. Write MainActivity.kt (Pro Level Permissions & UI)
         run: |
           cat > app/src/main/java/com/example/btcaller/ui/MainActivity.kt << 'KOTLIN_EOF'
           package com.example.btcaller.ui
@@ -129,12 +132,16 @@ jobs:
           import android.content.Intent
           import android.content.IntentFilter
           import android.content.pm.PackageManager
+          import android.net.Uri
           import android.os.Build
           import android.os.Bundle
+          import android.os.PowerManager
+          import android.provider.Settings
           import android.widget.ArrayAdapter
           import android.widget.Button
           import android.widget.ListView
           import android.widget.Toast
+          import androidx.appcompat.app.AlertDialog
           import androidx.appcompat.app.AppCompatActivity
           import androidx.core.app.ActivityCompat
           import androidx.core.content.ContextCompat
@@ -178,33 +185,20 @@ jobs:
                   val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
                   bluetoothAdapter = bluetoothManager.adapter
 
-                  if (bluetoothAdapter == null) {
-                      Toast.makeText(this, "इस डिवाइस में ब्लूटूथ उपलब्ध नहीं है", Toast.LENGTH_LONG).show()
-                      finish()
-                      return
-                  }
-
-                  if (bluetoothAdapter?.isEnabled == false) {
-                      val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                          if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                              startActivity(enableBtIntent)
-                          }
-                      } else {
-                          startActivity(enableBtIntent)
-                      }
-                  }
+                  // प्रो-लेवल परमिशन चेकिंग: ऐप खुलते ही सबसे पहले सारी परमिशन मांगेंगे
+                  requestAllProfessionalPermissions()
 
                   btnScan.setOnClickListener {
-                      if (checkAndRequestPermissions()) {
+                      if (hasAllPermissions()) {
                           startScanning()
+                      } else {
+                          Toast.makeText(this, "कृपया सभी परमिशन दें!", Toast.LENGTH_SHORT).show()
+                          requestAllProfessionalPermissions()
                       }
                   }
 
                   listView.setOnItemClickListener { _, _, position, _ ->
                       val device = discoveredDevices[position]
-                      Toast.makeText(this, "कनेक्ट कर रहे हैं: ${device.name ?: device.address}", Toast.LENGTH_SHORT).show()
-                      
                       val intent = Intent(this, CallActivity::class.java).apply {
                           putExtra("device_address", device.address)
                           putExtra("device_name", device.name ?: "Unknown Device")
@@ -213,88 +207,134 @@ jobs:
                   }
 
                   val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
-                  registerReceiver(receiver, filter)
+                  ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
               }
 
-              private fun startScanning() {
-                  if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                      discoveredDevices.clear()
-                      deviceNames.clear()
-                      listAdapter.notifyDataSetChanged()
-                      
-                      if (bluetoothAdapter?.isDiscovering == true) {
-                          bluetoothAdapter?.cancelDiscovery()
-                      }
-                      bluetoothAdapter?.startDiscovery()
-                      Toast.makeText(this, "डिवाइस खोजना शुरू...", Toast.LENGTH_SHORT).show()
+              // यह फ़ंक्शन एकदम Google ऐप्स की तरह सारी परमिशन मांगता है
+              private fun requestAllProfessionalPermissions() {
+                  val permissionsToRequest = mutableListOf<String>()
+
+                  // 1. Audio & Calls (माइक और कॉल)
+                  permissionsToRequest.add(Manifest.permission.RECORD_AUDIO)
+                  permissionsToRequest.add(Manifest.permission.READ_PHONE_STATE)
+                  permissionsToRequest.add(Manifest.permission.CALL_PHONE)
+
+                  // 2. Location (ब्लूटूथ सर्च के लिए अनिवार्य)
+                  permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+                  permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+
+                  // 3. Modern Android 12+ Bluetooth Permissions
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                      permissionsToRequest.add(Manifest.permission.BLUETOOTH_SCAN)
+                      permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
                   }
-              }
 
-              private val receiver = object : BroadcastReceiver() {
-                  override fun onReceive(context: Context, intent: Intent) {
-                      val action: String? = intent.action
-                      if (BluetoothDevice.ACTION_FOUND == action) {
-                          val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                              intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-                          } else {
-                              @Suppress("DEPRECATION")
-                              intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                          }
-                          
-                          if (device != null && !discoveredDevices.contains(device)) {
-                              if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                                  discoveredDevices.add(device)
-                                  val name = device.name ?: "Unknown Device"
-                                  deviceNames.add("$name\n${device.address}")
-                                  listAdapter.notifyDataSetChanged()
-                              }
-                          }
-                      }
+                  // 4. Android 13+ Notifications
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                      permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
                   }
-              }
 
-              private fun checkAndRequestPermissions(): Boolean {
-                  val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                      arrayOf(
-                          Manifest.permission.BLUETOOTH_SCAN,
-                          Manifest.permission.BLUETOOTH_CONNECT,
-                          Manifest.permission.ACCESS_FINE_LOCATION
-                      )
+                  val ungrantedPermissions = permissionsToRequest.filter {
+                      ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+                  }
+
+                  if (ungrantedPermissions.isNotEmpty()) {
+                      ActivityCompat.requestPermissions(this, ungrantedPermissions.toTypedArray(), PERMISSION_REQUEST_CODE)
                   } else {
-                      arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+                      // अगर सारी परमिशन मिल गई हैं, तो "CPU/Battery" परमिशन मांगें
+                      requestCpuBatteryOptimization()
                   }
+              }
 
-                  val listPermissionsNeeded = ArrayList<String>()
-                  for (p in permissions) {
-                      if (ContextCompat.checkSelfPermission(this, p) != PackageManager.PERMISSION_GRANTED) {
-                          listPermissionsNeeded.add(p)
+              // यह फ़ंक्शन "CPU" (Background Process) को चालू रखने की परमिशन मांगता है
+              private fun requestCpuBatteryOptimization() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                      val intent = Intent()
+                      val packageName = packageName
+                      val pm = getSystemService(POWER_SERVICE) as PowerManager
+                      if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                          AlertDialog.Builder(this)
+                              .setTitle("बैकग्राउंड परमिशन (CPU)")
+                              .setMessage("कॉल को बैकग्राउंड में चालू रखने के लिए बैटरी ऑप्टिमाइज़ेशन को बंद करना ज़रूरी है। कृपया अगली स्क्रीन पर 'Allow' चुनें।")
+                              .setPositiveButton("ठीक है") { _, _ ->
+                                  intent.action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                                  intent.data = Uri.parse("package:$packageName")
+                                  startActivity(intent)
+                              }
+                              .setNegativeButton("बाद में") { dialog, _ -> dialog.dismiss() }
+                              .show()
+                      } else {
+                          checkBluetoothState()
+                      }
+                  } else {
+                      checkBluetoothState()
+                  }
+              }
+
+              private fun checkBluetoothState() {
+                  if (bluetoothAdapter?.isEnabled == false) {
+                      val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                      if (hasAllPermissions()) {
+                          startActivity(enableBtIntent)
                       }
                   }
+              }
 
-                  if (listPermissionsNeeded.isNotEmpty()) {
-                      ActivityCompat.requestPermissions(this, listPermissionsNeeded.toTypedArray(), PERMISSION_REQUEST_CODE)
-                      return false
+              private fun hasAllPermissions(): Boolean {
+                  val requiredPerms = mutableListOf(
+                      Manifest.permission.RECORD_AUDIO,
+                      Manifest.permission.ACCESS_FINE_LOCATION
+                  )
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                      requiredPerms.add(Manifest.permission.BLUETOOTH_SCAN)
+                      requiredPerms.add(Manifest.permission.BLUETOOTH_CONNECT)
                   }
-                  return true
+                  return requiredPerms.all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
               }
 
               override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
                   super.onRequestPermissionsResult(requestCode, permissions, grantResults)
                   if (requestCode == PERMISSION_REQUEST_CODE) {
-                      if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                          startScanning()
+                      if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                          Toast.makeText(this, "परमिशन्स सफलतापूर्वक सेट हो गईं!", Toast.LENGTH_SHORT).show()
+                          requestCpuBatteryOptimization()
                       } else {
-                          Toast.makeText(this, "परमिशन देनी जरूरी है", Toast.LENGTH_SHORT).show()
+                          Toast.makeText(this, "ऐप चलाने के लिए सभी परमिशन देना अनिवार्य है!", Toast.LENGTH_LONG).show()
+                      }
+                  }
+              }
+
+              private fun startScanning() {
+                  if (!hasAllPermissions()) return
+                  
+                  discoveredDevices.clear()
+                  deviceNames.clear()
+                  listAdapter.notifyDataSetChanged()
+                  
+                  if (bluetoothAdapter?.isDiscovering == true) bluetoothAdapter?.cancelDiscovery()
+                  bluetoothAdapter?.startDiscovery()
+                  Toast.makeText(this, "डिवाइस खोजना शुरू...", Toast.LENGTH_SHORT).show()
+              }
+
+              private val receiver = object : BroadcastReceiver() {
+                  override fun onReceive(context: Context, intent: Intent) {
+                      if (BluetoothDevice.ACTION_FOUND == intent.action) {
+                          val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                          if (device != null && !discoveredDevices.contains(device)) {
+                              discoveredDevices.add(device)
+                              val name = if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                                  device.name ?: "Unknown Device"
+                              } else "Unknown"
+                              deviceNames.add("$name\n${device.address}")
+                              listAdapter.notifyDataSetChanged()
+                          }
                       }
                   }
               }
 
               override fun onDestroy() {
                   super.onDestroy()
-                  try {
-                      unregisterReceiver(receiver)
-                  } catch (e: Exception) {
-                  }
+                  try { unregisterReceiver(receiver) } catch (e: Exception) {}
               }
           }
           KOTLIN_EOF
@@ -311,6 +351,7 @@ jobs:
           import android.bluetooth.BluetoothSocket
           import android.content.pm.PackageManager
           import android.media.AudioManager
+          import android.os.Build
           import android.os.Bundle
           import android.widget.Button
           import android.widget.LinearLayout
@@ -396,286 +437,104 @@ jobs:
                   }
 
                   btnConnect.setOnClickListener {
-                      if (isConnected) {
-                          disconnectDevice()
-                      } else {
-                          connectDevice()
-                      }
+                      if (isConnected) disconnectDevice() else connectDevice()
                   }
-
-                  btnMute.setOnClickListener {
-                      toggleMute()
-                  }
-
-                  btnSpeaker.setOnClickListener {
-                      toggleSpeaker()
-                  }
-
-                  btnEndCall.setOnClickListener {
-                      endCall()
-                  }
+                  btnMute.setOnClickListener { toggleMute() }
+                  btnSpeaker.setOnClickListener { toggleSpeaker() }
+                  btnEndCall.setOnClickListener { endCall() }
               }
 
               private fun connectDevice() {
-                  if (device == null) {
-                      Toast.makeText(this, "डिवाइस नहीं मिला", Toast.LENGTH_SHORT).show()
-                      return
-                  }
-
+                  if (device == null) return
                   Thread {
                       try {
-                          if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                              return@Thread
-                          }
-
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return@Thread
                           bluetoothSocket = device?.createRfcommSocketToServiceRecord(SPP_UUID)
-
-                          if (bluetoothSocket != null) {
-                              bluetoothAdapter?.cancelDiscovery()
-                              bluetoothSocket?.connect()
-
-                              isConnected = true
-                              runOnUiThread {
-                                  statusText.text = "✓ कनेक्टेड\nकॉल सक्रिय है..."
-                                  btnConnect.text = "डिस्कनेक्ट करें"
-                                  Toast.makeText(this@CallActivity, "कनेक्ट हो गए!", Toast.LENGTH_SHORT).show()
-                              }
+                          bluetoothAdapter?.cancelDiscovery()
+                          bluetoothSocket?.connect()
+                          isConnected = true
+                          runOnUiThread {
+                              statusText.text = "✓ कनेक्टेड\nकॉल सक्रिय है..."
+                              btnConnect.text = "डिस्कनेक्ट करें"
                           }
                       } catch (e: IOException) {
                           isConnected = false
-                          runOnUiThread {
-                              statusText.text = "✕ कनेक्शन विफल\n${e.message}"
-                              Toast.makeText(this@CallActivity, "कनेक्शन विफल: ${e.message}", Toast.LENGTH_SHORT).show()
-                          }
+                          runOnUiThread { statusText.text = "✕ कनेक्शन विफल\n${e.message}" }
                       }
                   }.start()
               }
 
               private fun disconnectDevice() {
                   try {
-                      if (bluetoothSocket != null) {
-                          bluetoothSocket?.close()
-                          bluetoothSocket = null
-                      }
+                      bluetoothSocket?.close()
+                      bluetoothSocket = null
                       isConnected = false
                       statusText.text = "डिवाइस से डिस्कनेक्ट हो गए"
                       btnConnect.text = "दोबारा कनेक्ट करें"
-                  } catch (e: IOException) {
-                      Toast.makeText(this, "डिस्कनेक्ट त्रुटि: ${e.message}", Toast.LENGTH_SHORT).show()
-                  }
+                  } catch (e: IOException) {}
               }
 
               private fun toggleMute() {
-                  if (!isConnected) {
-                      Toast.makeText(this, "पहले कनेक्ट करें", Toast.LENGTH_SHORT).show()
-                      return
-                  }
-
+                  if (!isConnected) return
                   isMuted = !isMuted
                   val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-
-                  if (isMuted) {
-                      audioManager.isMicrophoneMute = true
-                      btnMute.text = "🔇 म्यूट"
-                      Toast.makeText(this, "माइक म्यूट हो गया", Toast.LENGTH_SHORT).show()
-                  } else {
-                      audioManager.isMicrophoneMute = false
-                      btnMute.text = "🔊 म्यूट नहीं"
-                      Toast.makeText(this, "माइक सक्रिय", Toast.LENGTH_SHORT).show()
-                  }
+                  audioManager.isMicrophoneMute = isMuted
+                  btnMute.text = if (isMuted) "🔇 म्यूट" else "🔊 म्यूट नहीं"
               }
 
               private fun toggleSpeaker() {
-                  if (!isConnected) {
-                      Toast.makeText(this, "पहले कनेक्ट करें", Toast.LENGTH_SHORT).show()
-                      return
-                  }
-
+                  if (!isConnected) return
                   isOnSpeaker = !isOnSpeaker
                   val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-
-                  if (isOnSpeaker) {
-                      audioManager.isSpeakerphoneOn = true
-                      btnSpeaker.text = "🔉 स्पीकर ऑन"
-                      Toast.makeText(this, "स्पीकर ऑन", Toast.LENGTH_SHORT).show()
-                  } else {
-                      audioManager.isSpeakerphoneOn = false
-                      btnSpeaker.text = "🔈 स्पीकर ऑफ"
-                      Toast.makeText(this, "स्पीकर ऑफ", Toast.LENGTH_SHORT).show()
-                  }
+                  audioManager.isSpeakerphoneOn = isOnSpeaker
+                  btnSpeaker.text = if (isOnSpeaker) "🔉 स्पीकर ऑन" else "🔈 स्पीकर ऑफ"
               }
 
               private fun endCall() {
                   disconnectDevice()
-                  statusText.text = "कॉल समाप्त हुआ"
-                  Toast.makeText(this, "कॉल ख़त्म", Toast.LENGTH_SHORT).show()
-                  
-                  Thread {
-                      Thread.sleep(1000)
-                      finish()
-                  }.start()
+                  finish()
               }
-
+              
               override fun onDestroy() {
                   super.onDestroy()
-                  try {
-                      if (bluetoothSocket != null) {
-                          bluetoothSocket?.close()
-                      }
-                  } catch (e: IOException) {
-                      e.printStackTrace()
-                  }
+                  try { bluetoothSocket?.close() } catch (e: IOException) {}
               }
           }
           KOTLIN_EOF
 
-      - name: 9. Write BluetoothManager.kt (Helper)
-        run: |
-          cat > app/src/main/java/com/example/btcaller/utils/BluetoothManager.kt << 'KOTLIN_EOF'
-          package com.example.btcaller.utils
-
-          import android.Manifest
-          import android.bluetooth.BluetoothAdapter
-          import android.bluetooth.BluetoothDevice
-          import android.bluetooth.BluetoothSocket
-          import android.content.Context
-          import android.content.pm.PackageManager
-          import android.os.Build
-          import androidx.core.app.ActivityCompat
-          import java.io.IOException
-          import java.util.UUID
-
-          class BluetoothManager(private val context: Context) {
-
-              private var bluetoothAdapter: BluetoothAdapter? = null
-              private var bluetoothSocket: BluetoothSocket? = null
-              private var isConnected = false
-
-              private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
-
-              fun init(adapter: BluetoothAdapter) {
-                  bluetoothAdapter = adapter
-              }
-
-              fun isBluetoothEnabled(): Boolean {
-                  return bluetoothAdapter?.isEnabled == true
-              }
-
-              fun enableBluetooth() {
-                  if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                      bluetoothAdapter?.enable()
-                  }
-              }
-
-              fun startDiscovery(): Boolean {
-                  return if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                      if (bluetoothAdapter?.isDiscovering == true) {
-                          bluetoothAdapter?.cancelDiscovery()
-                      }
-                      bluetoothAdapter?.startDiscovery() == true
-                  } else {
-                      false
-                  }
-              }
-
-              fun stopDiscovery() {
-                  if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                      bluetoothAdapter?.cancelDiscovery()
-                  }
-              }
-
-              fun getPairedDevices(): List<BluetoothDevice> {
-                  return if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                      bluetoothAdapter?.bondedDevices?.toList() ?: emptyList()
-                  } else {
-                      emptyList()
-                  }
-              }
-
-              fun connectToDevice(device: BluetoothDevice, callback: (Boolean, String) -> Unit) {
-                  Thread {
-                      try {
-                          if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                              callback(false, "परमिशन नहीं है")
-                              return@Thread
-                          }
-
-                          bluetoothSocket = device.createRfcommSocketToServiceRecord(SPP_UUID)
-                          bluetoothAdapter?.cancelDiscovery()
-                          bluetoothSocket?.connect()
-
-                          isConnected = true
-                          callback(true, "कनेक्ट हो गए")
-                      } catch (e: IOException) {
-                          isConnected = false
-                          callback(false, "कनेक्शन विफल: ${e.message}")
-                      }
-                  }.start()
-              }
-
-              fun disconnectDevice() {
-                  try {
-                      bluetoothSocket?.close()
-                      bluetoothSocket = null
-                      isConnected = false
-                  } catch (e: IOException) {
-                      e.printStackTrace()
-                  }
-              }
-
-              fun isConnected(): Boolean = isConnected
-
-              fun sendData(data: String): Boolean {
-                  return try {
-                      if (isConnected && bluetoothSocket != null) {
-                          val outputStream = bluetoothSocket?.outputStream
-                          outputStream?.write(data.toByteArray())
-                          outputStream?.flush()
-                          true
-                      } else {
-                          false
-                      }
-                  } catch (e: IOException) {
-                          false
-                  }
-              }
-          }
-          KOTLIN_EOF
-
-      - name: 10. Write AndroidManifest.xml
+      - name: 9. Write AndroidManifest.xml (All Advanced Permissions Added)
         run: |
           cat > app/src/main/AndroidManifest.xml << 'MANIFEST_EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:tools="http://schemas.android.com/tools"
-              package="com.example.btcaller">
+              xmlns:tools="http://tools.xmlns.com/tools">
 
-              <uses-permission android:name="android.permission.BLUETOOTH" />
-              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-              <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
-                  android:maxSdkVersion="30" />
-              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
-                  android:maxSdkVersion="30" />
-              <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
+              <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+              <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
               
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-              
               <uses-permission android:name="android.permission.RECORD_AUDIO" />
               <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
               
-              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+              <uses-permission android:name="android.permission.CALL_PHONE" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-              <uses-feature
-                  android:name="android.hardware.bluetooth"
-                  android:required="true" />
+              <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
+              <uses-feature android:name="android.hardware.microphone" android:required="true" />
 
               <application
                   android:allowBackup="true"
                   android:debuggable="true"
-                  android:icon="@android:drawable/sym_def_app_icon"
-                  android:label="@string/app_name"
-                  android:roundIcon="@android:drawable/sym_def_app_icon"
+                  android:icon="@drawable/ic_app_logo"
+                  android:label="BT Caller Pro"
+                  android:roundIcon="@drawable/ic_app_logo"
                   android:supportsRtl="true"
                   android:theme="@style/Theme.AppCompat.Light.DarkActionBar"
                   tools:targetApi="31">
@@ -692,76 +551,41 @@ jobs:
                   <activity
                       android:name=".ui.CallActivity"
                       android:exported="false"
-                      android:label="कॉल एक्टिविटी" />
+                      android:label="कॉल सक्रिय" />
 
               </application>
 
           </manifest>
           MANIFEST_EOF
 
-      - name: 11. Write strings.xml (Resources)
+      - name: 10. Write strings.xml (Resources)
         run: |
           cat > app/src/main/res/values/strings.xml << 'STRINGS_EOF'
           <resources>
-              <string name="app_name">BT Caller</string>
-              
-              <string name="btn_scan_devices">आस-पास के डिवाइस खोजें</string>
-              <string name="bluetooth_not_available">इस डिवाइस में ब्लूटूथ उपलब्ध नहीं है</string>
-              <string name="scanning_devices">डिवाइस खोजना शुरू...</string>
-              <string name="connecting_to">कनेक्ट कर रहे हैं</string>
-              <string name="permission_required">परमिशन देनी जरूरी है</string>
-              <string name="unknown_device">Unknown Device</string>
-              
-              <string name="device_connecting">डिवाइस से कनेक्ट हो रहे हैं...</string>
-              <string name="device_not_found">डिवाइस नहीं मिला</string>
-              <string name="connection_failed">कनेक्शन विफल</string>
-              <string name="device_connected">कनेक्टेड - कॉल सक्रिय है</string>
-              <string name="connected">कनेक्ट हो गए!</string>
-              <string name="disconnected">डिवाइस से डिस्कनेक्ट हो गए</string>
-              <string name="reconnect">दोबारा कनेक्ट करें</string>
-              <string name="disconnect">डिस्कनेक्ट करें</string>
-              
-              <string name="btn_connect">कनेक्ट करें</string>
-              <string name="btn_mute">🔊 म्यूट नहीं</string>
-              <string name="btn_mute_on">🔇 म्यूट</string>
-              <string name="btn_speaker">🔈 स्पीकर</string>
-              <string name="btn_speaker_on">🔉 स्पीकर ऑन</string>
-              <string name="btn_speaker_off">🔈 स्पीकर ऑफ</string>
-              <string name="btn_end_call">कॉल समाप्त करें</string>
-              
-              <string name="status_muted">माइक म्यूट हो गया</string>
-              <string name="status_unmuted">माइक सक्रिय</string>
-              <string name="status_speaker_on">स्पीकर ऑन</string>
-              <string name="status_speaker_off">स्पीकर ऑफ</string>
-              <string name="status_call_ended">कॉल ख़त्म</string>
-              <string name="status_call_disconnected">कॉल समाप्त हुआ</string>
-              <string name="connect_first">पहले कनेक्ट करें</string>
+              <string name="app_name">BT Caller Pro</string>
           </resources>
           STRINGS_EOF
 
-      - name: 12. Create proguard-rules.pro
+      - name: 11. Create proguard-rules.pro
         run: |
           cat > app/proguard-rules.pro << 'PROGUARD_EOF'
           -keep class com.example.btcaller.** { *; }
           -keepclassmembers class com.example.btcaller.** { *; }
           -dontwarn com.example.btcaller.**
-          
           -keep class androidx.** { *; }
-          -keepclassmembers class androidx.** { *; }
           PROGUARD_EOF
 
-      - name: 13. Setup Gradle Wrapper
-        run: |
-          gradle wrapper --gradle-version 8.5
-          chmod +x gradlew
+      - name: 12. Setup Gradle (Official Action)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.5'
 
-      - name: 14. Build Debug APK
+      - name: 13. Build Debug APK
         run: |
-          ./gradlew assembleDebug --stacktrace
+          gradle assembleDebug --stacktrace
 
-      - name: 15. Upload Debug APK
+      - name: 14. Upload Professional Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: BTCaller-Debug-APK
+          name: BTCaller-Pro-APK
           path: app/build/outputs/apk/debug/app-debug.apk
-
